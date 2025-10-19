@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Newton Scope</title>
+  <script type="module">
+    const invoke = window.__TAURI__.core.invoke;
+
+    async function drawImage() {
+      const width = 512;
+      const height = 512;
+      const base64Data = await invoke("create_test_image", {width, height});
+      console.log(base64Data.slice(0, 50));
+
+      const img = new Image();
+      img.src = "data:image/png;base64," + base64Data;
+      img.onload = () => {
+        const canvas = document.getElementById("fractal");
+        const ctx = canvas.getContext("2d");
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0);
+      };
+    }
+
+    window.addEventListener("DOMContentLoaded", drawImage);
+  </script>
+  <style>
+    body {
+      text-align: center;
+      background: #fafafa;
+      font-family: sans-serif;
+    }
+    canvas {
+      border: 1px solid #888;
+      margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello Tauri!</h1>
+  <h2>Tauri RGB PNG Sample</h2>
+  <canvas id="fractal" width="512" height="512"></canvas>
+</body>
+</html>
+
