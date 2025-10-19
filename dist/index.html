@@ -11,9 +11,6 @@
       const height = 512;
       const pngArrayBuffer = await invoke("create_fractal_png", {width, height});
       const uint8 = new Uint8Array(pngArrayBuffer);
-      if (pngArrayBuffer.length === 0) {
-        alert("png array is empty!");
-      }
 
       const blob = new Blob([uint8], { type: "image/png" });
       const imgUrl = URL.createObjectURL(blob);
