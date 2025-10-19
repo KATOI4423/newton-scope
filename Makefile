@@ -22,4 +22,21 @@ image:
 		-t $(DOCKERIMAGE_NAME) $(DOCKER_DIR)
 		
 container-run:
-	$(DOCKER_RUN_BASECMD) -it -e BUILD_CMD="bash -i" $(DOCKERIMAGE_NAME)
+	$(DOCKER_RUN_BASECMD) -it $(DOCKERIMAGE_NAME) \
+		"bash -i"
+
+# ================
+# Build commands
+# ================
+
+.PHONY: backend
+backend: backend-linux
+
+.PHONY: backend-linux backend-linux-debug
+backend-linux:
+	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
+		"cd src-tauri && cargo build --release --target x86_64-unknown-linux-gnu"
+
+backend-linux-debug:
+	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
+		"cd src-tauri && cargo build --target x86_64-unknown-linux-gnu"

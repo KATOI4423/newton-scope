@@ -46,4 +46,4 @@ ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 
 WORKDIR /work
 
-CMD ["bash", "-c", "${BUILD_CMD}"]
+ENTRYPOINT ["bash", "-c"]
