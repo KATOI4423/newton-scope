@@ -9,7 +9,7 @@
     async function drawImage() {
       const width = 512;
       const height = 512;
-      const base64Data = await invoke("create_test_image", {width, height});
+      const base64Data = await invoke("create_fractal_image", {width, height});
       console.log(base64Data.slice(0, 50));
 
       const img = new Image();
@@ -38,8 +38,6 @@
   </style>
 </head>
 <body>
-  <h1>Hello Tauri!</h1>
-  <h2>Tauri RGB PNG Sample</h2>
   <canvas id="fractal" width="512" height="512"></canvas>
 </body>
 </html>
