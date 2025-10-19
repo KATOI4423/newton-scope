@@ -4,7 +4,7 @@ mod fractal;
 pub fn run() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
-      fractal::create_fractal_image,
+      fractal::create_fractal_png,
       fractal::update_formula,
     ])
     .setup(|app| {
