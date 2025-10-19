@@ -47,3 +47,12 @@ cargo-cache: .cargo
 
 .cargo:
 	@-mkdir -p $(CARGO_CACHE_DIR)
+
+
+.PHONY: backend-clean backend-distclean
+backend-clean:
+	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
+		"cd src-tauri && cargo clean"
+
+backend-distclean: backend-clean
+	rm -rf $(CARGO_CACHE_DIR)
