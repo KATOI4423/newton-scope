@@ -59,25 +59,3 @@ function main() {
 }
 
 window.addEventListener("DOMContentLoaded", main);
-
-
-function adjustCanvasSize() {
-    const wrap = document.querySelector('.canvas-wrap');
-    const canvas = document.getElementById('fractal');
-    const coords = document.querySelector('.coords');
-
-    if (!wrap || !canvas || !coords) return;
-
-    const wrapRect = wrap.getBoundingClientRect();
-    const coordsRect = coords.getBoundingClientRect();
-
-    const availableHeight = wrapRect.height - coordsRect.height;
-    const availableWidth = wrapRect.width;
-
-    const size = Math.min(availableWidth, availableHeight);
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
-}
-
-window.addEventListener("load", adjustCanvasSize);
-window.addEventListener("resize", adjustCanvasSize);
