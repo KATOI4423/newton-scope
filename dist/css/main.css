@@ -1,0 +1,129 @@
+:root {
+    --gap: 12px;
+    --panel-width: 360px;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui,Segoe UI,Robot,"Hiragino Kaku Gothic ProN",Meirio,sans-serif;
+}
+
+.app {
+    display: flex;
+    height: 100vh;
+    gap: var(--gap);
+    padding: var(--gap);
+    box-sizing: border-box;
+}
+
+/* canvas pannel */
+
+.canvas-wrap {
+    position: relative;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    overflow: hidden;
+    gap: 8px;
+}
+
+canvas {
+    display: block;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px sold #ccc;
+    background: #000;
+}
+
+.coords {
+    position: relative;
+    width: 100%;
+    padding: 6px 0;
+    border-top: 1px solid #333;
+    box-sizing: border-box;
+    text-align: left;
+    font-size: 13px;
+    color: #444;
+}
+
+/* control pannel */
+
+.controls {
+    width: var(--panel-width);
+    min-width: 260px;
+    border-left: 1px solid #eee;
+    padding-left: 12px;
+    box-sizing: border-box;
+}
+
+.controls h2 {
+    margin: 4px 0 10px;
+    font-size: 16px;
+}
+
+.field {
+    margin-bottom: 10px;
+}
+
+label {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.row {
+    display: flex;
+    gap: 8px;
+}
+.row > * {flex: 1}
+
+button {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 0;
+    background: #246;
+    color: #fff;
+    cursor: pointer;
+}
+
+.hint {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+}
+
+.small {
+    font-size: 12px;
+    color: #666;
+}
+
+/* responsive */
+
+@media (aspect-ratio < 1 / 1) {
+    .app {
+        flex-direction: column;
+    }
+
+    .controls {
+        width: auto;
+        border-left: none;
+        border-top: 1px solid #eee;
+        padding-left: 0;
+        padding-top: 10px;
+    }
+}

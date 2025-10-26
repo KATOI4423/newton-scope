@@ -2,22 +2,65 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Newton Scope</title>
   <script type="module" src="./js/main.js"></script>
-  <style>
-    body {
-      text-align: center;
-      background: #fafafa;
-      font-family: sans-serif;
-    }
-    canvas {
-      border: 1px solid #888;
-      margin-top: 1em;
-    }
-  </style>
+  <link rel="stylesheet" href="./css/main.css" />
 </head>
 <body>
-  <canvas id="glcanvas" width="1024" height="1024"></canvas>
+  <div class="app">
+    <div class="canvas-wrap">
+      <canvas id="fractal" width="1024" height="1024"></canvas>
+      <div class="coords" id="status">
+        Click / drag to pan, mousewheel to zoom | Center: <span id="center"> - </span> Scale: <span id="span"> - </span>
+      </div>
+    </div>
+
+    <aside class="controls">
+      <h2>Fractal Controls</h2>
+
+      <div class="field">
+        <label for="fexpr">f(z) ― <span class="small">span text for fexpr</span></label>
+        <input id="fexpr" type="text" value="z^3 - 1" />
+        <div class="hint">hint text for fexpr</div>
+      </div>
+
+      <div class="field">
+        <label for="size">Image Size</label>
+        <div class="row">
+          <select id="presetSize">
+            <option>256</option>
+            <option selected>512</option>
+            <option>1024</option>
+            <option>2048</option>
+            <option>4096</option>
+            <option>8192</option>
+          </select>
+        </div>
+        <div class="hint">Larger value takes longer to compute.</div>
+      </div>
+
+      <div class="field">
+        <label for maxIter>Max iterations</label>
+        <input id="maxIter" type="number" min="16" max="4096" value="256" />
+        <input id="iterRange" type="range" min="16" max="4096" value="256" />
+        <div class="hint">The left-hand value and slider are linked.</div>
+      </div>
+
+      <div class="field">
+        <div class="row">
+          <button id="renderBtn">Render</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="row">
+          <button id="saveBtn">Save</button>
+          <button id="uploadBtn">Upload</button>
+        </div>
+      </div>
+    </aside>
+  </div>
 </body>
 </html>
 
