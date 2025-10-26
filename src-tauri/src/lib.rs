@@ -1,11 +1,7 @@
-mod fractal;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
-      fractal::create_fractal_png,
-      fractal::update_formula,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
