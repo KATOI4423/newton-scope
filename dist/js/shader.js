@@ -35,9 +35,9 @@ vec2 cpow(vec2 z, int n) {
 vec4 jet(float t) {
     t = clamp(t, 0.0, 1.0);
     float r = clamp(1.5 - abs(4.0 * t - 3.0), 0.0, 1.0);
-    float b = clamp(1.5 - abs(4.0 * t - 2.0), 0.0, 1.0);
-    float g = clamp(1.5 - abs(4.0 * t - 1.0), 0.0, 1.0);
-    return vec4(r, b, g, 1.0);
+    float g = clamp(1.5 - abs(4.0 * t - 2.0), 0.0, 1.0);
+    float b = clamp(1.5 - abs(4.0 * t - 1.0), 0.0, 1.0);
+    return vec4(r, g, b, 1.0);
 }
 
 void main() {
