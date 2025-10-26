@@ -16,6 +16,34 @@ const saveBtn = document.getElementById('saveBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 
 const invoke = window.__TAURI__.core.invoke;
+const { confirm } = window.__TAURI__.dialog;
+
+// default setting
+async function setDefault(isUserClidked) {
+    if (isUserClidked) {
+        const ok = await confirm('Are you sure to reset all configures?',
+            { title: '', type: 'warning' }
+        );
+        if (!ok) return;
+    }
+
+    fexpr.value = 'z^3 - 1';
+    size.value = 512;
+    maxIter.value = 256; iterRange.value = 256;
+    center.textContent = '(0.0, 0.0)';
+    scale.textContent = '2.0';
+}
+
+async function initialize() {
+    await setDefault(false);
+}
+
+async function clickedReset() {
+    await setDefault(true);
+}
+
+resetBtn.addEventListener('click', clickedReset);
+window.addEventListener("DOMContentLoaded", initialize);
 
 // link iter inputs
 iterRange.addEventListener('input', () => { maxIter.value = iterRange.value; });
