@@ -54,22 +54,22 @@ function main() {
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
     // Uniform locations
-    const u_center = gl.getUniformLocation(program, "u_center");
     const u_scale  = gl.getUniformLocation(program, "u_scale");
     const u_order  = gl.getUniformLocation(program, "u_order");
     const u_coeffs = gl.getUniformLocation(program, "u_coeffs");
+    const u_repmax = gl.getUniformLocation(program, "u_repmax");
 
     // パラメータ設定（例）
-    gl.uniform2f(u_center, 0.0, 0.0);
-    gl.uniform1f(u_scale, 1.0);
+    gl.uniform1f(u_scale, 2.0);
     gl.uniform1i(u_order, 3);
+    gl.uniform1i(u_repmax, 512);
 
     // 係数（`f(z) = z^3 - 1` のTaylor展開）
     const coeffs = new Float32Array([
-        0.0, 0.0,      // a0
-        1.0, 0.0,       // a1
+        -1.0, 0.0,      // a0
+        0.0, 0.0,       // a1
         0.0, 0.0,       // a2
-        0.0, 0.0,       // a3 (z^3)
+        1.0, 0.0,       // a3 (z^3)
         0.0, 0.0,       // 残りは空
         0.0, 0.0,
         0.0, 0.0,
