@@ -10,6 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "Newton Scope",
         "width": 1920,
         "height": 1080,
@@ -18,6 +19,15 @@
       }
     ],
     "security": {
+      "capabilities": [
+        {
+          "identifier": "dialog",
+          "windows": ["*"],
+          "permissions": [
+            "dialog:allow-confirm"
+          ]
+        }
+      ],
       "csp": null
     }
   },
