@@ -1,7 +1,12 @@
+mod calculate;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  calculate::initialize();
+
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
+      calculate::set_formula,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

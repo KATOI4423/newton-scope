@@ -16,7 +16,7 @@ const saveBtn = document.getElementById('saveBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 
 const invoke = window.__TAURI__.core.invoke;
-const { confirm } = window.__TAURI__.dialog;
+const { confirm, message } = window.__TAURI__.dialog;
 
 // default setting
 async function setDefault(isUserClidked) {
@@ -44,6 +44,21 @@ async function clickedReset() {
 
 resetBtn.addEventListener('click', clickedReset);
 window.addEventListener("DOMContentLoaded", initialize);
+
+async function setFexpr() {
+    const f = fexpr.value;
+    const ret = await invoke("set_formula", {formula: f});
+    if (ret !== "OK") {
+        console.error("Failed to set formula:", f, ret);
+        await message(ret, {title: "Failed to set f(z)", kind: "error"});
+        return;
+    }
+    console.log("Successed to set formula", f);
+
+    renderBtn.click();
+}
+
+fexpr.addEventListener('change', setFexpr);
 
 // link iter inputs
 iterRange.addEventListener('input', () => { maxIter.value = iterRange.value; });
