@@ -1,5 +1,9 @@
 use formulac;
 use num_complex::Complex;
+use num_traits::{
+    Float,
+    FromPrimitive,
+};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
@@ -52,6 +56,53 @@ fn initialize_formulac() {
 
     *FORMULAC.lock().unwrap() = formulac;
 }
+
+
+/// 複素数平面の情報を保持する構造体
+struct Canvas<T> 
+    where T: Float + FromPrimitive,
+{
+    center: num_complex::Complex<T>,
+    scale:  T,
+    size:   u16, // up to 65,535
+}
+
+impl<T: Float + FromPrimitive> Canvas<T> {
+    fn new() -> Self {
+        Self {
+            center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
+            scale:  T::zero(),
+            size:   512,
+        }
+    }
+
+    fn set_center(&mut self, re: T, im: T) {
+        self.center.re = re;
+        self.center.im = im;
+    }
+
+    fn center(self) -> num_complex::Complex<T> {
+        self.center
+    }
+
+    fn set_scale(&mut self, scale: T) {
+        self.scale = scale;
+    }
+
+    fn scale(self) -> T {
+        self.scale
+    }
+
+    fn set_size(&mut self, size: u16) {
+        self.size = size;
+    }
+
+    fn size(self) -> u16 {
+        self.size
+    }
+}
+
+
 
 #[tauri::command]
 pub fn initialize() {
