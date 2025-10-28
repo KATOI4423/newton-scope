@@ -103,6 +103,39 @@ impl<T: Float + FromPrimitive> Canvas<T> {
 }
 
 
+/// フラクタル計算に使用する情報を保持する構造体
+struct Fractal {
+    formulac:   Formulac,
+    canvas:     Canvas<f64>,
+    max_iter:   u16, // up to 65,535
+}
+
+impl Fractal {
+    fn new() -> Self {
+        Self {
+            formulac:   Formulac::new(),
+            canvas:     Canvas::new(),
+            max_iter:   64,
+        }
+    }
+
+    fn formulac(&self) -> &Formulac {
+        &self.formulac
+    }
+
+    fn canvas(&self) -> &Canvas<f64> {
+        &self.canvas
+    }
+
+    fn set_max_iter(&mut self, max_iter: u16) {
+        self.max_iter = max_iter;
+    }
+
+    fn max_iter(&self) -> u16 {
+        self.max_iter
+    }
+}
+
 
 #[tauri::command]
 pub fn initialize() {
