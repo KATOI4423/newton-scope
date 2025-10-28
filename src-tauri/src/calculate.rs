@@ -46,17 +46,6 @@ impl Formulac {
     }
 }
 
-static FORMULAC: Lazy<Mutex<Formulac>> = Lazy::new(|| {
-    Mutex::new(Formulac::new())
-});
-
-/// FORMULACの初期化関数
-fn initialize_formulac() {
-    let formulac = Formulac::new();
-
-    *FORMULAC.lock().unwrap() = formulac;
-}
-
 
 /// 複素数平面の情報を保持する構造体
 struct Canvas<T> 
@@ -123,8 +112,16 @@ impl Fractal {
         &self.formulac
     }
 
+    fn formulac_mut(&mut self) ->&mut Formulac {
+        &mut self.formulac
+    }
+
     fn canvas(&self) -> &Canvas<f64> {
         &self.canvas
+    }
+
+    fn canvas_mut(&mut self) -> &Canvas<f64> {
+        &mut self.canvas
     }
 
     fn set_max_iter(&mut self, max_iter: u16) {
@@ -137,9 +134,16 @@ impl Fractal {
 }
 
 
+static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
+    Mutex::new(Fractal::new())
+});
+
+/// FRACTALの初期化関数
 #[tauri::command]
 pub fn initialize() {
-    initialize_formulac();
+    let fractal = Fractal::new();
+
+    *FRACTAL.lock().unwrap() = fractal;
 }
 
 /// 数式をformulacに設定する
@@ -149,9 +153,9 @@ pub fn initialize() {
 /// - エラー: "<エラーメッセージ>"
 #[tauri::command]
 pub fn set_formula(formula: String) -> String {
-    let mut f = FORMULAC.lock().unwrap();
+    let mut fractal = FRACTAL.lock().unwrap();
 
-    match f.set_formula(&formula) {
+    match fractal.formulac_mut().set_formula(&formula) {
         Ok(_) => "OK".to_string(),
         Err(err) => err,
     }
