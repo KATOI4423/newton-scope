@@ -81,7 +81,7 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.center.im = im;
     }
 
-    fn center(self) -> num_complex::Complex<T> {
+    fn center(&self) -> num_complex::Complex<T> {
         self.center
     }
 
@@ -89,7 +89,7 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.scale = scale;
     }
 
-    fn scale(self) -> T {
+    fn scale(&self) -> T {
         self.scale
     }
 
@@ -97,7 +97,7 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.size = size;
     }
 
-    fn size(self) -> u16 {
+    fn size(&self) -> u16 {
         self.size
     }
 }
