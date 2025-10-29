@@ -7,6 +7,12 @@ pub fn run() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       calculate::set_formula,
+      calculate::initialize,
+      calculate::get_default_formula,
+      calculate::get_center_str,
+      calculate::get_scale_str,
+      calculate::get_size,
+      calculate::get_max_iter,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

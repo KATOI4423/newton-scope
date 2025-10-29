@@ -27,11 +27,13 @@ async function setDefault(isUserClidked) {
         if (!ok) return;
     }
 
-    fexpr.value = 'z^3 - 1';
-    size.value = 512;
-    maxIter.value = 256; iterRange.value = 256;
-    center.textContent = '(0.0, 0.0)';
-    scale.textContent = '2.0';
+    await invoke("initialize");
+    fexpr.value = await invoke("get_default_formula");
+    size.value = await invoke("get_size");
+    maxIter.value = await invoke("get_max_iter");
+    iterRange.value = maxIter.value;
+    center.textContent = await invoke("get_center_str");
+    scale.textContent = await invoke("get_scale_str");
 }
 
 async function initialize() {

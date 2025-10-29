@@ -2,7 +2,7 @@ use formulac;
 use num_complex::Complex;
 use num_traits::{
     Float,
-    FromPrimitive,
+    FromPrimitive, ToPrimitive,
 };
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -133,6 +133,8 @@ impl Fractal {
     }
 }
 
+/// 初期数式
+static FORMULA: &str = "z^3 - 1";
 
 static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
     Mutex::new(Fractal::new())
@@ -141,9 +143,52 @@ static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
 /// FRACTALの初期化関数
 #[tauri::command]
 pub fn initialize() {
-    let fractal = Fractal::new();
+    let mut fractal = Fractal::new();
+    fractal.formulac_mut().set_formula(FORMULA).unwrap();
 
     *FRACTAL.lock().unwrap() = fractal;
+}
+
+#[tauri::command]
+pub fn get_default_formula() -> String {
+    FORMULA.to_string()
+}
+
+/// 指数表記の際に、小数点がない場合は ".0" を追加する
+fn format_with_decimal(x: f64) -> String {
+    let s = format!("{:e}", x);
+    if s.contains('.') {
+        s
+    } else {
+        s.replacen('e', ".0e", 1)
+    }
+}
+
+#[tauri::command]
+pub fn get_center_str() -> String {
+    let center = FRACTAL.lock().unwrap()
+        .canvas().center();
+    format!("({re}, {im})",
+        re = format_with_decimal(center.re),
+        im = format_with_decimal(center.im)
+    )
+}
+
+#[tauri::command]
+pub fn get_scale_str() -> String {
+    format!("{}", format_with_decimal(FRACTAL.lock().unwrap().canvas.scale()))
+}
+
+#[tauri::command]
+pub fn get_size() -> i32 {
+    FRACTAL.lock().unwrap()
+        .canvas().size().to_i32().unwrap() // The conversion u16 -> i32 never fails
+}
+
+#[tauri::command]
+pub fn get_max_iter() -> i32 {
+    FRACTAL.lock().unwrap()
+        .max_iter().to_i32().unwrap() // The conversion u16 -> i32 never fails
 }
 
 /// 数式をformulacに設定する
