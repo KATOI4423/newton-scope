@@ -54,10 +54,12 @@ impl Formulac {
         }
     }
 
+    #[allow(dead_code)]
     fn set_vars(&mut self, vars: &[(&str, Complex<f64>)]) {
         self.vars.insert(vars);
     }
 
+    #[allow(dead_code)]
     fn set_usrs(&mut self, function_list: &[(&str, formulac::UserDefinedFunction)]) {
         for (key, func) in function_list {
             self.usrs.register(*key, func.clone());
