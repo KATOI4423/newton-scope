@@ -7,14 +7,42 @@ use num_traits::{
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
-/// formulacが生成する関数オブジェクトの型
-type Func = dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static;
+/// formulacが生成する関数オブジェクトを保持する型
+macro_rules! FORMULAC_RETURN_TYPE {
+    () => { Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static> };
+}
+
+/// formulacが生成する関数オブジェクトを静的ディスパッチで配列に格納するために、Enumを定義する
+enum Func {
+    F(FORMULAC_RETURN_TYPE!()),
+}
+
+impl Func {
+    #[inline(always)]
+    fn call(&self, args: &[Complex<f64>]) -> Complex<f64> {
+        match self {
+            Self::F(func) => func(args)
+        }
+    }
+
+    fn new() -> Self {
+        Self::F(Box::new(formulac::compile(
+            "z", &["z"],
+            &formulac::Variables::new(),
+            &formulac::UserDefinedTable::new()
+        ).unwrap()))
+    }
+
+    fn from(func: impl Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static) -> Self {
+        Func::F(Box::new(func))
+    }
+}
 
 /// formulacの変数を保持する構造体
 struct Formulac {
     vars: formulac::Variables,
     usrs: formulac::UserDefinedTable,
-    func: Box<Func>,
+    funcs: [Func; 4],
 }
 
 impl Formulac {
@@ -22,7 +50,7 @@ impl Formulac {
         Self {
             vars: formulac::Variables::new(),
             usrs: formulac::UserDefinedTable::new(),
-            func: Box::new(|_| Complex::ZERO),
+            funcs: [Func::new(), Func::new(), Func::new(), Func::new()],
         }
     }
 
@@ -37,12 +65,26 @@ impl Formulac {
     }
 
     fn set_formula(&mut self, formula: &str) -> Result<(), String> {
-        self.func = Box::new(formulac::compile(formula, &["z"], &self.vars, &self.usrs)?);
+        self.funcs[0] = Func::from(formulac::compile(
+            formula, &["z"], &self.vars, &self.usrs)?
+        );
+        self.funcs[1] = Func::from(formulac::compile(
+            &format!("diff({}, z)", formula),
+            &["z"], &self.vars, &self.usrs)?
+        );
+        self.funcs[2] = Func::from(formulac::compile(
+            &format!("diff({}, z, 2)", formula),
+            &["z"], &self.vars, &self.usrs)?
+        );
+        self.funcs[3] = Func::from(formulac::compile(
+            &format!("diff({}, z, 3)", formula),
+            &["z"], &self.vars, &self.usrs)?
+        );
         Ok(())
     }
 
-    fn func(&self) -> &Func {
-        self.func.as_ref()
+    fn funcs(&self) -> &[Func; 4] {
+        &self.funcs
     }
 }
 
