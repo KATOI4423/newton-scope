@@ -6,9 +6,8 @@ in vec2 v_position;
 out vec4 outColor;
 
 // Uniforms (CPUから設定)
-uniform float u_scale;          // スケール S
 uniform int u_order;            // Taylor展開の次数
-uniform vec2 u_coeffs[8];       // 最大8項分の係数（実部, 虚部）
+uniform vec2 u_coeffs[5];       // 最大5項分の係数（実部, 虚部）
 uniform int u_repmax;           // ニュートン法の反復最大値
 
 // 複素数を vec2 として扱う
@@ -32,15 +31,13 @@ vec4 jet(float t) {
 
 // Taylor展開でのfとdfを、Horner法により求める
 void eval_f_and_df(vec2 z, out vec2 f, out vec2 df) {
-    vec2 sz = u_scale * z; // s * z
-
     f = u_coeffs[u_order];
     df = u_coeffs[u_order + 1];
 
     for (int i = u_order - 1; i >= 0; --i) {
-        vec2 sz_inv_i = sz / float(i + 1);
-        f = cadd(cmul(f, sz_inv_i), u_coeffs[i]);
-        df = cadd(cmul(df, sz_inv_i), u_coeffs[i + 1]);
+        vec2 z_inv_i = z / float(i + 1);
+        f = cadd(cmul(f, z_inv_i), u_coeffs[i]);
+        df = cadd(cmul(df, z_inv_i), u_coeffs[i + 1]);
     }
 }
 
@@ -52,7 +49,7 @@ vec2 newton_method(vec2 z) {
     // Taylor展開でのf & dfを、Horner法により求める
     eval_f_and_df(z, f, df);
 
-    return z - cdiv(f, u_scale * df);
+    return z - cdiv(f, df);
 }
 
 bool is_converged(vec2 z1, vec2 z2) {

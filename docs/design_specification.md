@@ -89,7 +89,7 @@ f'(c + sz'_n) = \sum_{k=0}^{\infty} {\frac{s^k}{k!}f^{k+1}(c)z'^k_n}
 
 ```math
 \begin{equation}
-z'_{n+1} = z'_n - \frac{\displaystyle \sum_{k=0}^{\infty} {\frac{s^k}{k!}f^k(c)z'^k_n}}{\displaystyle s\sum_{k=0}^{\infty} {\frac{s^k}{k!}f^{k+1}(c)z'^k_n}}
+z'_{n+1} = z'_n - \frac{\displaystyle \sum_{k=0}^{\infty} {\frac{s^k}{k!}f^k(c)z'^k_n}}{\displaystyle \sum_{k=0}^{\infty} {\frac{s^{k+1}}{k!}f^{k+1}(c)z'^k_n}}
 \end{equation}
 ```
 
@@ -129,17 +129,19 @@ f'(c + sz'_n) = \bigg( \cdots \Big( \frac{f^{k+1}(c)}{k!} sz'_n + \frac{f^{k}(c)
 \end{equation}
 ```
 
-となるため、どちらも $z'^k_n$ までの次数で求めるには、以下のように計算すれば良い。
+となる。
+
+ここで、$s$ はCPUによる任意精度の浮動小数点型であり、$z'^k_n$ はGPUによるFloat型であるので、式 $(11)$ $(12)$ での $s z'_n$ の計算は、GPUでは処理できない。
+どこで、$s$ の掛け算を $f^k(c)$ 側に逃がすことで対応する。
 
 ```C++
-auto coeffs = [..]; // coeff[0]~coeff[k+1]まで
-auto sz = s * z_n;
+auto coeffs = [..]; // coeff[0]~coeff[k+1]まで. coeff[i] = f^i * s^i
 auto mut f  = coeffs[k];
 auto mut df = coeffs[k+1];
 
 for (i = k - 1; i >= 0; --i) {
-    f = f * sz / (i + 1) + coeffs[i];
-    df = df * sz / (i + 1) + coeffs[i+1];
+    f = f * z / (i + 1) + coeffs[i];
+    df = df * z / (i + 1) + coeffs[i+1];
 }
 ```
 
