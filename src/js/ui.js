@@ -14,6 +14,8 @@ const resetBtn = document.getElementById('resetBtn');
 const saveBtn = document.getElementById('saveBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 
+let prevFormula = "";
+
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
@@ -35,6 +37,7 @@ async function setDefault(isUserClidked) {
 
     await invoke("initialize");
     fexpr.value = await invoke("get_default_formula");
+    prevFormula = fexpr.value;
     size.value = await invoke("get_default_size");
     maxIter.value = await invoke("get_default_max_iter");
     iterRange.value = maxIter.value;
@@ -65,9 +68,11 @@ async function setFexpr() {
     if (ret !== "OK") {
         console.error("Failed to set formula:", f, ret);
         await message(ret, {title: "Failed to set f(z)", kind: "error"});
+        fexpr.value = prevFormula;
         return;
     }
     console.log("Successed to set formula", f);
+    prevFormula = f;
 
     await setCoeffs();
     plot();

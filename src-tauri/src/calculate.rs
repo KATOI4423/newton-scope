@@ -75,15 +75,19 @@ impl Formulac {
     }
 
     fn set_formula(&mut self, formula: &str) -> Result<(), String> {
-        self.funcs[0] = Func::from(formulac::compile(
+        let mut funcs: [Func; default::FORMULAC_FUNCS_LEN] = core::array::from_fn(|_| Func::new());
+
+        funcs[0] = Func::from(formulac::compile(
             formula, &["z"], &self.vars, &self.usrs)?
         );
-        for i in 1..self.funcs.len() {
-            self.funcs[i] = Func::from(formulac::compile(
+        for i in 1..default::FORMULAC_FUNCS_LEN {
+            funcs[i] = Func::from(formulac::compile(
                 &format!("diff({}, z, {})", formula, i),
                 &["z"], &self.vars, &self.usrs)?
             );
         }
+
+        self.funcs = funcs;
         Ok(())
     }
 
