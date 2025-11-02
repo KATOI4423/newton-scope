@@ -14,6 +14,8 @@ const resetBtn = document.getElementById('resetBtn');
 const saveBtn = document.getElementById('saveBtn');
 const uploadBtn = document.getElementById('uploadBtn');
 
+const spinner = document.getElementById('spinner');
+
 let prevFormula = "";
 
 const invoke = window.__TAURI__.core.invoke;
@@ -64,17 +66,31 @@ window.addEventListener("DOMContentLoaded", initialize);
 
 async function setFexpr() {
     const f = fexpr.value;
-    const ret = await invoke("set_formula", {formula: f});
-    if (ret !== "OK") {
-        console.error("Failed to set formula:", f, ret);
-        await message(ret, {title: "Failed to set f(z)", kind: "error"});
-        fexpr.value = prevFormula;
-        return;
-    }
-    prevFormula = f;
 
-    await setCoeffs();
-    plot();
+    const delayMsec = 500;
+    let showSpinner = true;
+    const timer = setTimeout(() => {
+        if (showSpinner) spinner.style.display = "flex";
+    }, delayMsec);
+
+    try {
+        const ret = await invoke("set_formula", {formula: f});
+        if (ret !== "OK") {
+            showSpinner = false; // エラー時はスピナー表示を止める
+            await message(ret, {title: "Failed to set f(z)", kind: "error"});
+            fexpr.value = prevFormula;
+            throw Error("Failed to set formula:", f, ret); // 例外を送信することで、エラーログに出力 & finallyの終了処理を確実に行う
+        }
+        await setCoeffs();
+        plot();
+    } catch (e) {
+        console.error(e);
+    } finally {
+        showSpinner = false;
+        clearTimeout(timer);
+        spinner.style.display = "none";
+        prevFormula = f;
+    }
 }
 
 fexpr.addEventListener('change', setFexpr);

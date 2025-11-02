@@ -256,11 +256,18 @@ pub fn get_coeffs() -> Vec<f32> {
 /// - 成功: "OK"
 /// - エラー: "<エラーメッセージ>"
 #[tauri::command]
-pub fn set_formula(formula: String) -> String {
-    let mut fractal = FRACTAL.lock().unwrap();
+pub async fn set_formula(formula: String) -> String {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut fractal = FRACTAL.lock().unwrap();
+        match fractal.formulac_mut().set_formula(&formula) {
+            Ok(_) => "OK".to_string(),
+            Err(e) => e.to_string()
+        }
+    })
+    .await;
 
-    match fractal.formulac_mut().set_formula(&formula) {
-        Ok(_) => "OK".to_string(),
-        Err(err) => err,
+    match result {
+        Ok(ok) => ok,
+        Err(e) => e.to_string(),
     }
 }
