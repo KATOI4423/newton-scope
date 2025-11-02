@@ -88,7 +88,6 @@ export function plot() {
 
 export async function setCoeffs() {
     const coeffs = new Float32Array(await invoke("get_coeffs"));
-    console.log(coeffs);
     gl.uniform2fv(u_coeffs, coeffs);
 }
 

@@ -71,7 +71,6 @@ async function setFexpr() {
         fexpr.value = prevFormula;
         return;
     }
-    console.log("Successed to set formula", f);
     prevFormula = f;
 
     await setCoeffs();
