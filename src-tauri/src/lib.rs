@@ -9,10 +9,10 @@ pub fn run() {
       calculate::set_formula,
       calculate::initialize,
       calculate::get_default_formula,
+      calculate::get_default_size,
+      calculate::get_default_max_iter,
       calculate::get_center_str,
       calculate::get_scale_str,
-      calculate::get_size,
-      calculate::get_max_iter,
       calculate::get_coeffs,
     ])
     .setup(|app| {

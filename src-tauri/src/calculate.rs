@@ -99,7 +99,6 @@ struct Canvas<T>
 {
     center: num_complex::Complex<T>,
     scale:  T,
-    size:   u16, // up to 65,535
 }
 
 impl<T: Float + FromPrimitive> Canvas<T> {
@@ -107,7 +106,6 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         Self {
             center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
             scale:  T::from(default::CANVAS_SCALE).unwrap(),
-            size:   default::CANVAS_SIZE,
         }
     }
 
@@ -127,14 +125,6 @@ impl<T: Float + FromPrimitive> Canvas<T> {
     fn scale(&self) -> T {
         self.scale
     }
-
-    fn set_size(&mut self, size: u16) {
-        self.size = size;
-    }
-
-    fn size(&self) -> u16 {
-        self.size
-    }
 }
 
 
@@ -142,7 +132,6 @@ impl<T: Float + FromPrimitive> Canvas<T> {
 struct Fractal {
     formulac:   Formulac,
     canvas:     Canvas<f64>,
-    max_iter:   u16, // up to 65,535
 }
 
 
@@ -151,7 +140,6 @@ impl Fractal {
         Self {
             formulac:   Formulac::new(),
             canvas:     Canvas::new(),
-            max_iter:   default::FRACTAL_MAX_ITER,
         }
     }
 
@@ -169,14 +157,6 @@ impl Fractal {
 
     fn canvas_mut(&mut self) -> &Canvas<f64> {
         &mut self.canvas
-    }
-
-    fn set_max_iter(&mut self, max_iter: u16) {
-        self.max_iter = max_iter;
-    }
-
-    fn max_iter(&self) -> u16 {
-        self.max_iter
     }
 }
 
@@ -227,15 +207,13 @@ pub fn get_scale_str() -> String {
 }
 
 #[tauri::command]
-pub fn get_size() -> i32 {
-    FRACTAL.lock().unwrap()
-        .canvas().size().to_i32().unwrap() // The conversion u16 -> i32 never fails
+pub fn get_default_size() -> i32 {
+    default::CANVAS_SIZE.into()
 }
 
 #[tauri::command]
-pub fn get_max_iter() -> i32 {
-    FRACTAL.lock().unwrap()
-        .max_iter().to_i32().unwrap() // The conversion u16 -> i32 never fails
+pub fn get_default_max_iter() -> i32 {
+    default::FRACTAL_MAX_ITER.into()
 }
 
 #[tauri::command]

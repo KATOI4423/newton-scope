@@ -37,8 +37,8 @@ async function setDefault(isUserClidked) {
 
     await invoke("initialize");
     fexpr.value = await invoke("get_default_formula");
-    size.value = await invoke("get_size");
-    maxIter.value = await invoke("get_max_iter");
+    size.value = await invoke("get_default_size");
+    maxIter.value = await invoke("get_default_max_iter");
     iterRange.value = maxIter.value;
     center.textContent = await invoke("get_center_str");
     scale.textContent = await invoke("get_scale_str");
