@@ -72,7 +72,7 @@ async function setup() {
     const posLoc = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(posLoc);
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    setViewPort(canvas.width, canvas.height)
 
     u_max_iter = gl.getUniformLocation(program, "u_max_iter");
     u_coeffs = gl.getUniformLocation(program, "u_coeffs");
@@ -94,4 +94,8 @@ export async function setCoeffs() {
 
 export function setMaxIter(maxIter) {
     gl.uniform1i(u_max_iter, maxIter);
+}
+
+export function setViewPort(w, h) {
+    gl.viewport(0, 0, w, h);
 }

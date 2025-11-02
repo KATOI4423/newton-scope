@@ -22,6 +22,7 @@ import {
     plot,
     setCoeffs,
     setMaxIter,
+    setViewPort,
 } from "./shader.js"
 
 renderBtn.addEventListener("click", plot);
@@ -43,6 +44,7 @@ async function setDefault(isUserClidked) {
     center.textContent = await invoke("get_center_str");
     scale.textContent = await invoke("get_scale_str");
 
+    setSize();
     setMaxIter(maxIter.value);
     await setCoeffs();
     plot();
@@ -88,6 +90,17 @@ maxIter.addEventListener('change', () => {
 });
 
 
+function setSize() {
+    const value = size.value;
+    canvas.width = value;
+    canvas.height = value;
+    setViewPort(value, value);
+}
+
+size.addEventListener("change", () => {
+    setSize();
+    renderBtn.click();
+});
 
 // fractalの描写要素を正方形に保つ
 function adjustCanvasSize() {
