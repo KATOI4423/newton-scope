@@ -10,7 +10,6 @@ const fexpr = document.getElementById('fexpr');
 const size = document.getElementById('presetSize');
 const maxIter = document.getElementById('maxIter');
 const iterRange = document.getElementById('iterRange');
-const renderBtn = document.getElementById('renderBtn');
 const resetBtn = document.getElementById('resetBtn');
 const saveBtn = document.getElementById('saveBtn');
 const uploadBtn = document.getElementById('uploadBtn');
@@ -24,8 +23,6 @@ import {
     setMaxIter,
     setViewPort,
 } from "./shader.js"
-
-renderBtn.addEventListener("click", plot);
 
 // default setting
 async function setDefault(isUserClidked) {
@@ -72,7 +69,7 @@ async function setFexpr() {
     console.log("Successed to set formula", f);
 
     await setCoeffs();
-    renderBtn.click();
+    plot();
 }
 
 fexpr.addEventListener('change', setFexpr);
@@ -81,12 +78,12 @@ fexpr.addEventListener('change', setFexpr);
 iterRange.addEventListener('input', () => {
     maxIter.value = iterRange.value;
     setMaxIter(iterRange.value);
-    renderBtn.click();
+    plot();
 });
 maxIter.addEventListener('change', () => {
     iterRange.value = maxIter.value;
     setMaxIter(maxIter.value);
-    renderBtn.click();
+    plot();
 });
 
 
@@ -99,7 +96,7 @@ function setSize() {
 
 size.addEventListener("change", () => {
     setSize();
-    renderBtn.click();
+    plot();
 });
 
 // fractalの描写要素を正方形に保つ
