@@ -76,10 +76,6 @@ async function setup() {
 
     u_max_iter = gl.getUniformLocation(program, "u_max_iter");
     u_coeffs = gl.getUniformLocation(program, "u_coeffs");
-
-    setMaxIter(await invoke("get_max_iter"));
-    await setCoeffs();
-    plot();
 }
 
 window.addEventListener("DOMContentLoaded", setup);

@@ -18,6 +18,14 @@ const uploadBtn = document.getElementById('uploadBtn');
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
+import {
+    plot,
+    setCoeffs,
+    setMaxIter,
+} from "./shader.js"
+
+renderBtn.addEventListener("click", plot);
+
 // default setting
 async function setDefault(isUserClidked) {
     if (isUserClidked) {
@@ -34,6 +42,10 @@ async function setDefault(isUserClidked) {
     iterRange.value = maxIter.value;
     center.textContent = await invoke("get_center_str");
     scale.textContent = await invoke("get_scale_str");
+
+    setMaxIter(maxIter.value);
+    await setCoeffs();
+    plot();
 }
 
 async function initialize() {
@@ -57,14 +69,25 @@ async function setFexpr() {
     }
     console.log("Successed to set formula", f);
 
+    await setCoeffs();
     renderBtn.click();
 }
 
 fexpr.addEventListener('change', setFexpr);
 
 // link iter inputs
-iterRange.addEventListener('input', () => { maxIter.value = iterRange.value; });
-maxIter.addEventListener('change', () => { iterRange.value = maxIter.value; });
+iterRange.addEventListener('input', () => {
+    maxIter.value = iterRange.value;
+    setMaxIter(iterRange.value);
+    renderBtn.click();
+});
+maxIter.addEventListener('change', () => {
+    iterRange.value = maxIter.value;
+    setMaxIter(maxIter.value);
+    renderBtn.click();
+});
+
+
 
 // fractalの描写要素を正方形に保つ
 function adjustCanvasSize() {
