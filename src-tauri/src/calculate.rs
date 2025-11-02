@@ -5,6 +5,7 @@ use num_traits::{
     FromPrimitive, ToPrimitive,
 };
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::sync::Mutex;
 
 /// formulacが生成する関数オブジェクトを保持する型
@@ -75,19 +76,27 @@ impl Formulac {
     }
 
     fn set_formula(&mut self, formula: &str) -> Result<(), String> {
-        let mut funcs: [Func; default::FORMULAC_FUNCS_LEN] = core::array::from_fn(|_| Func::new());
+        let funcs: Result<Vec<Func>, String> = (0..default::FORMULAC_FUNCS_LEN)
+            .into_par_iter()
+            .map(|i| {
+                match i {
+                    0 => Ok(Func::from(
+                        formulac::compile(formula, &["z"], &self.vars, &self.usrs)?
+                    )),
+                    i => Ok(Func::from(
+                        formulac::compile(
+                    &format!("diff({}, z, {})", formula, i),
+                    &["z"], &self.vars, &self.usrs)?
+                    ))
+                }
+            })
+            .collect();
 
-        funcs[0] = Func::from(formulac::compile(
-            formula, &["z"], &self.vars, &self.usrs)?
-        );
-        for i in 1..default::FORMULAC_FUNCS_LEN {
-            funcs[i] = Func::from(formulac::compile(
-                &format!("diff({}, z, {})", formula, i),
-                &["z"], &self.vars, &self.usrs)?
-            );
-        }
+        self.funcs = match funcs?.try_into() {
+            Ok(array) => array,
+            Err(_) => unreachable!("length never changed"),
+        };
 
-        self.funcs = funcs;
         Ok(())
     }
 
