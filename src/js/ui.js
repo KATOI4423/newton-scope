@@ -38,6 +38,7 @@ async function setDefault(isUserClidked) {
     size.value = await invoke("get_default_size");
     maxIter.value = await invoke("get_default_max_iter");
     iterRange.value = maxIter.value;
+    updateIterRangeBackground();
     center.textContent = await invoke("get_center_str");
     scale.textContent = await invoke("get_scale_str");
 
@@ -86,6 +87,14 @@ maxIter.addEventListener('change', () => {
     plot();
 });
 
+function updateIterRangeBackground() {
+    const baseColor = '#ccc';
+    const activeColor = '#ff4500';
+
+    const progress = (iterRange.value / iterRange.max) * 100;
+    iterRange.style.background = `linear-gradient(to right, ${activeColor} ${progress}%, ${baseColor} ${progress}%)`;
+}
+iterRange.addEventListener('input', updateIterRangeBackground);
 
 function setSize() {
     const value = size.value;
