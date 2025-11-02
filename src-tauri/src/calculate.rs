@@ -12,6 +12,14 @@ macro_rules! FORMULAC_RETURN_TYPE {
     () => { Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static> };
 }
 
+/// 初期値
+mod default {
+    pub static FORMULAC_FUNCS_LEN: usize = 8;
+    pub static CANVAS_SCALE: f64 = 1.0;
+    pub static CANVAS_SIZE: u16 = 512;
+    pub static FRACTAL_MAX_ITER: u16 = 128;
+}
+
 /// formulacが生成する関数オブジェクトを静的ディスパッチで配列に格納するために、Enumを定義する
 enum Func {
     F(FORMULAC_RETURN_TYPE!()),
@@ -42,7 +50,7 @@ impl Func {
 struct Formulac {
     vars: formulac::Variables,
     usrs: formulac::UserDefinedTable,
-    funcs: [Func; 4],
+    funcs: [Func; default::FORMULAC_FUNCS_LEN],
 }
 
 impl Formulac {
@@ -50,7 +58,7 @@ impl Formulac {
         Self {
             vars: formulac::Variables::new(),
             usrs: formulac::UserDefinedTable::new(),
-            funcs: [Func::new(), Func::new(), Func::new(), Func::new()],
+            funcs: core::array::from_fn(|_| Func::new()),
         }
     }
 
@@ -70,22 +78,16 @@ impl Formulac {
         self.funcs[0] = Func::from(formulac::compile(
             formula, &["z"], &self.vars, &self.usrs)?
         );
-        self.funcs[1] = Func::from(formulac::compile(
-            &format!("diff({}, z)", formula),
-            &["z"], &self.vars, &self.usrs)?
-        );
-        self.funcs[2] = Func::from(formulac::compile(
-            &format!("diff({}, z, 2)", formula),
-            &["z"], &self.vars, &self.usrs)?
-        );
-        self.funcs[3] = Func::from(formulac::compile(
-            &format!("diff({}, z, 3)", formula),
-            &["z"], &self.vars, &self.usrs)?
-        );
+        for i in 1..self.funcs.len() {
+            self.funcs[i] = Func::from(formulac::compile(
+                &format!("diff({}, z, {})", formula, i),
+                &["z"], &self.vars, &self.usrs)?
+            );
+        }
         Ok(())
     }
 
-    fn funcs(&self) -> &[Func; 4] {
+    fn funcs(&self) -> &[Func; default::FORMULAC_FUNCS_LEN] {
         &self.funcs
     }
 }
@@ -104,8 +106,8 @@ impl<T: Float + FromPrimitive> Canvas<T> {
     fn new() -> Self {
         Self {
             center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
-            scale:  T::zero(),
-            size:   512,
+            scale:  T::from(default::CANVAS_SCALE).unwrap(),
+            size:   default::CANVAS_SIZE,
         }
     }
 
@@ -143,12 +145,13 @@ struct Fractal {
     max_iter:   u16, // up to 65,535
 }
 
+
 impl Fractal {
     fn new() -> Self {
         Self {
             formulac:   Formulac::new(),
             canvas:     Canvas::new(),
-            max_iter:   64,
+            max_iter:   default::FRACTAL_MAX_ITER,
         }
     }
 
@@ -233,6 +236,27 @@ pub fn get_size() -> i32 {
 pub fn get_max_iter() -> i32 {
     FRACTAL.lock().unwrap()
         .max_iter().to_i32().unwrap() // The conversion u16 -> i32 never fails
+}
+
+#[tauri::command]
+pub fn get_coeffs() -> Vec<f32> {
+    let f = FRACTAL.lock().unwrap();
+    let scale = f.canvas().scale();
+    let center = f.canvas().center();
+    let funcs = f.formulac().funcs();
+    let mut s = 1.0;
+
+    let mut coeffs: Vec<f32> = Vec::with_capacity(funcs.len() * 2);
+    for func in funcs {
+        let coeff = func.call(&[center]) * s;
+        coeffs.push(coeff.re.to_f32()
+            .expect(&format!("Failed to cast to f32")));
+        coeffs.push(coeff.im.to_f32()
+            .expect(&format!("Failed to cast to f32")));
+        s *= scale;
+    }
+
+    coeffs
 }
 
 /// 数式をformulacに設定する

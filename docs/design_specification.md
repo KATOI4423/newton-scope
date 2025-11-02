@@ -8,6 +8,7 @@
     - [座標系の定義](#座標系の定義)
     - [Newton法の漸化式の変形](#newton法の漸化式の変形)
     - [Horner's rule](#horners-rule)
+    - [関数と導関数を求める](#関数と導関数を求める)
     - [Horner's ruleのNewton法への適応](#horners-ruleのnewton法への適応)
     - [変形Newton法漸化式の精度](#変形newton法漸化式の精度)
 
@@ -113,35 +114,85 @@ f(z) = ( \cdots (a_n z + a_{n-1}) z + \cdots + a_1)z + a_0
 
 この変形した状態で計算すると、乗算を $n(n+1)/2$ 回から $n$ 回に減らすことができる。
 
+#### 関数と導関数を求める
+
+horner's ruleを使用して、関数 $f(z)$ と、その導関数 $f'(z)$ を求める。
+
+まず、次の部分多項式を定義する。
+
+```math
+\begin{equation}
+r_k(z) \overset{def}{=} \Big(\cdots (a_n z + a_{n-1}) z + \cdots + a_{k+1} \Big)
+\end{equation}
+```
+
+すなわち、 $r_k$ は $a_{k+1}, a_{k+2}, \cdots, a_n$ のみを使用した多項式（Horner's ruleの途中値）である。
+
+すると、部分的に $k$ 番目の項まで組み込んだ時の多項式 $f_k(z)$ は、
+
+```math
+\begin{equation}
+f_k(z) = r_k(z)z + a_k
+\end{equation}
+```
+
+となり、最終的には $f(z) = f_0(z)$ となる。
+
+ここで、$f_k(z)$ を $z$ で微分すると、積の微分則から、以下の形になる。
+
+```math
+\begin{equation}
+f'_k(z) = r'_k(z)z + r_k(z)
+\end{equation}
+```
+
+つまり、部分多項式 $r_k$ の導関数 $r'_k$ を用いて、 $f'_k$ が計算できる。
+
+$r_k$ の定義から、$r_k$ の漸化式は以下の通りになる。
+
+```math
+\begin{equation}
+r_{k-1}(z) = r_k(z)z + a_k
+\end{equation}
+```
+
+これを微分することで、 $r'_k$ についての漸化式を得る。
+
+```math
+\begin{equation}
+r'_{k-1}(z) = r'_k(z)z + r_k(z)
+\end{equation}
+```
+
+これらの漸化式を使用することで、Horner's ruleによって関数 $f(z)$ と、その導関数 $f'(z)$ を求めることができる。
+
 #### Horner's ruleのNewton法への適応
 
-$f$ と $df/dz$ を同時に求めることを考えると、式 $(6)$ $(7)$ $(10)$ から、
+式 $(8)$ をループで計算することを考える。
+
+$s$ と $c$ はそれぞれ任意精度の浮動小数点型として与えるため、CPUで処理しなければならない。それとは異なり、$k!$ は整数型で計算できる値であり、 $z'^k_n$ はWebGLが保持するFloat型の座標値である。
+
+そのため、$\{a_k\} := \{s^k f^k(c)\}$ をCPUで計算し、$z'^k_n / k!$ はGPUによって計算する。
 
 ```math
 \begin{equation}
-f(c + sz'_n) = \bigg( \cdots \Big( \frac{f^k(c)}{k!} sz'_n + \frac{f^{k-1}(c)}{(k-1)!} \Big)sz'_n + \cdots + f^1(c) \bigg) sz'_n + f^0(c)
+\begin{split}
+\frac{z'^k_n}{k!} &= \frac{z'_n \cdot z'_n \cdots z'_n}{k (k-1) \cdots 3 \cdot 2 \cdot 1} \\
+                  &= \frac{z'_n}{k} \frac{z'_n}{k-1} \cdots \frac{z'_n}{3} \frac{z'_n}{2} \frac{z'_n}{1} 
+\end{split}
 \end{equation}
 ```
 
-```math
-\begin{equation}
-f'(c + sz'_n) = \bigg( \cdots \Big( \frac{f^{k+1}(c)}{k!} sz'_n + \frac{f^{k}(c)}{(k-1)!} \Big)sz'_n + \cdots + f^2(c) \bigg) sz'_n + f^1(c)
-\end{equation}
+となるので、Horner' ruleによるループ計算で、$z'_n$ の代わりに $z'_n / i$ （$i$ はループカウンタ）を使用することで対応できる。
+
 ```
+coeffs = [..]; // coeff[0]~coeff[N-1]まで. coeff[i] = f^i * s^i
+f  <- coeffs[N-1];
+df <- 0;
 
-となる。
-
-ここで、$s$ はCPUによる任意精度の浮動小数点型であり、$z'^k_n$ はGPUによるFloat型であるので、式 $(11)$ $(12)$ での $s z'_n$ の計算は、GPUでは処理できない。
-どこで、$s$ の掛け算を $f^k(c)$ 側に逃がすことで対応する。
-
-```C++
-auto coeffs = [..]; // coeff[0]~coeff[k+1]まで. coeff[i] = f^i * s^i
-auto mut f  = coeffs[k];
-auto mut df = coeffs[k+1];
-
-for (i = k - 1; i >= 0; --i) {
-    f = f * z / (i + 1) + coeffs[i];
-    df = df * z / (i + 1) + coeffs[i+1];
+for (i = N - 2; i >= 0; --i) {
+    df <- df * z / (i + 1) + f
+    f  <-  f * z / (i + 1) + coeffs[i];
 }
 ```
 

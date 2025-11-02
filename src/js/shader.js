@@ -1,5 +1,10 @@
 // shader.js
 
+const invoke = window.__TAURI__.core.invoke;
+let gl;
+let u_coeffs;
+let u_max_iter;
+
 async function loadShaderSource(url) {
     const res = await fetch(url);
     if (!res.ok) {
@@ -8,7 +13,7 @@ async function loadShaderSource(url) {
     return await res.text();
 }
 
-function createShader(gl, type, source) {
+function createShader(type, source) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
@@ -20,14 +25,14 @@ function createShader(gl, type, source) {
     return shader;
 }
 
-async function createProgram(gl) {
+async function createProgram() {
     const [vertexShaderSource, fragmentShaderSource] = await Promise.all([
         loadShaderSource("/glsl/vertex.glsl"),
         loadShaderSource("/glsl/fragment.glsl")
     ]);
 
-    const vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+    const vs = createShader(gl.VERTEX_SHADER, vertexShaderSource);
+    const fs = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
     const program = gl.createProgram();
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
@@ -41,13 +46,17 @@ async function createProgram(gl) {
 
 async function setup() {
     const canvas = document.getElementById("fractal");
-    const gl = canvas.getContext("webgl2");
+    gl = canvas.getContext("webgl2");
     if (!gl) {
         alert("WebGL2 not supported");
         return;
     }
 
-    const program = await createProgram(gl);
+    const program = await createProgram();
+    if (!program) {
+        console.error("Failed to create Program");
+        return;
+    }
     gl.useProgram(program);
 
     // 頂点データ(全画面矩形)
@@ -63,31 +72,30 @@ async function setup() {
     const posLoc = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(posLoc);
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-    // Uniform locations
-    const u_order  = gl.getUniformLocation(program, "u_order");
-    const u_coeffs = gl.getUniformLocation(program, "u_coeffs");
-    const u_repmax = gl.getUniformLocation(program, "u_repmax");
-
-    // パラメータ設定（例）
-    gl.uniform1i(u_order, 3);
-    gl.uniform1i(u_repmax, 128);
-
-    // 係数（`f(z) = z^3 - 1` のTaylor展開）
-    const coeffs = new Float32Array([
-        -1.0, 0.0,      // a0
-        0.0, 0.0,       // a1
-        0.0, 0.0,       // a2
-        8.0, 0.0,       // a3 (z^3)
-        0.0, 0.0,       // a4
-    ]);
-    gl.uniform2fv(u_coeffs, coeffs);
-
-    // 描画
     gl.viewport(0, 0, canvas.width, canvas.height);
+
+    u_max_iter = gl.getUniformLocation(program, "u_max_iter");
+    u_coeffs = gl.getUniformLocation(program, "u_coeffs");
+
+    setMaxIter(await invoke("get_max_iter"));
+    await setCoeffs();
+    plot();
+}
+
+window.addEventListener("DOMContentLoaded", setup);
+
+export function plot() {
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-window.addEventListener("DOMContentLoaded", setup);
+export async function setCoeffs() {
+    const coeffs = new Float32Array(await invoke("get_coeffs"));
+    console.log(coeffs);
+    gl.uniform2fv(u_coeffs, coeffs);
+}
+
+export function setMaxIter(maxIter) {
+    gl.uniform1i(u_max_iter, maxIter);
+}

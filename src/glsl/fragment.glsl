@@ -5,10 +5,11 @@ precision highp float;
 in vec2 v_position;
 out vec4 outColor;
 
+const int U_COEFFS_LEN = 8;
+
 // Uniforms (CPUから設定)
-uniform int u_order;            // Taylor展開の次数
-uniform vec2 u_coeffs[5];       // 最大5項分の係数（実部, 虚部）
-uniform int u_repmax;           // ニュートン法の反復最大値
+uniform vec2 u_coeffs[U_COEFFS_LEN]; // 係数（実部, 虚部）
+uniform int u_max_iter; // ニュートン法の反復最大値
 
 // 複素数を vec2 として扱う
 vec2 cadd(vec2 a, vec2 b) { return a + b; }
@@ -31,13 +32,13 @@ vec4 jet(float t) {
 
 // Taylor展開でのfとdfを、Horner法により求める
 void eval_f_and_df(vec2 z, out vec2 f, out vec2 df) {
-    f = u_coeffs[u_order];
-    df = u_coeffs[u_order + 1];
+    f = u_coeffs[U_COEFFS_LEN - 1];
+    df = vec2(0.0);
 
-    for (int i = u_order - 1; i >= 0; --i) {
-        vec2 z_inv_i = z / float(i + 1);
-        f = cadd(cmul(f, z_inv_i), u_coeffs[i]);
-        df = cadd(cmul(df, z_inv_i), u_coeffs[i + 1]);
+    for (int i = U_COEFFS_LEN - 2; i >= 0; --i) {
+        vec2 z_inv_i = z;
+        df = cadd(cmul(df, z_inv_i), f);
+        f  = cadd(cmul(f,  z_inv_i), u_coeffs[i]);
     }
 }
 
@@ -53,16 +54,17 @@ vec2 newton_method(vec2 z) {
 }
 
 bool is_converged(vec2 z1, vec2 z2) {
-    const float EPSILON = 1.0e-5;
-    return all(lessThan(abs(z1 - z2), vec2(EPSILON)));
+    const float EPSILON = 1.0e-14; // abs(z1-z2)のsqrtを取らないため、(1.0e-7)を2乗する
+    vec2 d = z1 - z2;
+    return dot(d, d) < EPSILON;
 }
 
 void main() {
     vec2 z1 = v_position;
     vec2 z2 = z1;
-    float iter = float(u_repmax);
+    float iter = float(u_max_iter);
 
-    for (int i = 0; i < u_repmax; ++i) {
+    for (int i = 0; i < u_max_iter; ++i) {
         z2 = newton_method(z1);
         if (is_converged(z1, z2)) {
             iter = float(i);
@@ -71,5 +73,5 @@ void main() {
         z1 = z2;
     }
 
-    outColor = jet(iter / float(u_repmax));
+    outColor = jet(iter / float(u_max_iter));
 }

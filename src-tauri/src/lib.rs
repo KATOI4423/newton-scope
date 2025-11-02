@@ -13,6 +13,7 @@ pub fn run() {
       calculate::get_scale_str,
       calculate::get_size,
       calculate::get_max_iter,
+      calculate::get_coeffs,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
