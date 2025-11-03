@@ -190,7 +190,7 @@ canvas.addEventListener('mousemove', async (e) => {
 canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
 
-    const zoomLevel = (e.deltaY < 0) ? 1 : -1;
+    const zoomLevel = (e.deltaY > 0) ? 1 : -1; // 奥がズームイン,手前がズームアウト
 
     await invoke("zoom_view", { level: zoomLevel });
     await setScaleStr();
