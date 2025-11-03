@@ -14,6 +14,8 @@ pub fn run() {
       calculate::get_center_str,
       calculate::get_scale_str,
       calculate::get_coeffs,
+      calculate::move_view,
+      calculate::zoom_view,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

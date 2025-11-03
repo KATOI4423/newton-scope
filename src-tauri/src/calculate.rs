@@ -16,7 +16,7 @@ macro_rules! FORMULAC_RETURN_TYPE {
 /// 初期値
 mod default {
     pub static FORMULAC_FUNCS_LEN: usize = 8;
-    pub static CANVAS_SCALE: f64 = 1.0;
+    pub static CANVAS_ZOOM_LEVEL: i32 = 0;
     pub static CANVAS_SIZE: u16 = 512;
     pub static FRACTAL_MAX_ITER: u16 = 128;
 }
@@ -111,14 +111,14 @@ struct Canvas<T>
     where T: Float + FromPrimitive,
 {
     center: num_complex::Complex<T>,
-    scale:  T,
+    zoom_level:  i32,
 }
 
 impl<T: Float + FromPrimitive> Canvas<T> {
     fn new() -> Self {
         Self {
             center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
-            scale:  T::from(default::CANVAS_SCALE).unwrap(),
+            zoom_level: default::CANVAS_ZOOM_LEVEL,
         }
     }
 
@@ -131,12 +131,13 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.center
     }
 
-    fn set_scale(&mut self, scale: T) {
-        self.scale = scale;
+    fn zoom(&mut self, level: i32) {
+        self.zoom_level += level;
     }
 
-    fn scale(&self) -> T {
-        self.scale
+    fn scale(&self) -> f64 {
+        const STEP: f64 = 1.0 / 8.0;
+        2.0f64.powf(self.zoom_level as f64 * STEP)
     }
 }
 
@@ -168,7 +169,7 @@ impl Fractal {
         &self.canvas
     }
 
-    fn canvas_mut(&mut self) -> &Canvas<f64> {
+    fn canvas_mut(&mut self) -> &mut Canvas<f64> {
         &mut self.canvas
     }
 }
@@ -216,7 +217,7 @@ pub fn get_center_str() -> String {
 
 #[tauri::command]
 pub fn get_scale_str() -> String {
-    format!("{}", format_with_decimal(FRACTAL.lock().unwrap().canvas.scale()))
+    format!("{}", format_with_decimal(FRACTAL.lock().unwrap().canvas().scale()))
 }
 
 #[tauri::command]
@@ -270,4 +271,25 @@ pub async fn set_formula(formula: String) -> String {
         Ok(ok) => ok,
         Err(e) => e.to_string(),
     }
+}
+
+/// 中心座標を移動させる
+#[tauri::command]
+pub fn move_view(dx: f64, dy: f64) {
+    let mut fractal = FRACTAL.lock().unwrap();
+    let scale = fractal.canvas().scale();
+    let center = fractal.canvas().center();
+    const WIDTH: f64 = 2.0; // [-1: 1]の幅
+
+    fractal.canvas_mut().set_center(
+        center.re - dx * scale * WIDTH,
+        center.im + dy * scale * WIDTH
+    );
+}
+
+/// 縮尺を変更する
+#[tauri::command]
+pub fn zoom_view(level: i32) {
+    let mut fractal = FRACTAL.lock().unwrap();
+    fractal.canvas_mut().zoom(level);
 }

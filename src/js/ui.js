@@ -44,8 +44,8 @@ async function setDefault(isUserClidked) {
     maxIter.value = await invoke("get_default_max_iter");
     iterRange.value = maxIter.value;
     updateIterRangeBackground();
-    center.textContent = await invoke("get_center_str");
-    scale.textContent = await invoke("get_scale_str");
+    await setCenterStr();
+    await setScaleStr();
 
     setSize();
     setMaxIter(maxIter.value);
@@ -63,6 +63,14 @@ async function clickedReset() {
 
 resetBtn.addEventListener('click', clickedReset);
 window.addEventListener("DOMContentLoaded", initialize);
+
+async function setCenterStr() {
+    center.textContent = await invoke("get_center_str");
+}
+
+async function setScaleStr() {
+    scale.textContent = await invoke("get_scale_str");
+}
 
 async function setFexpr() {
     const f = fexpr.value;
@@ -143,3 +151,49 @@ function adjustCanvasSize() {
 
 window.addEventListener("load", adjustCanvasSize);
 window.addEventListener("resize", adjustCanvasSize);
+
+let isDragging = false;
+let lastX = 0;
+let lastY = 0;
+
+function getCanvasCoordinate(mouseEvent) {
+    const rect = canvas.getBoundingClientRect();
+    return [mouseEvent.clientX - rect.left, mouseEvent.clientY - rect.top];
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+
+    [lastX, lastY] = getCanvasCoordinate(e);
+    console.debug(lastX, lastY);
+});
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+canvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+});
+canvas.addEventListener('mousemove', async (e) => {
+    if (!isDragging)
+        return;
+
+    const rect = canvas.getBoundingClientRect();
+    const [canvasX, canvasY] = getCanvasCoordinate(e);
+    const [dx, dy] = [canvasX - lastX, canvasY - lastY];
+    [lastX, lastY] = [canvasX, canvasY];
+
+    await invoke("move_view", { dx: dx/rect.width, dy: dy/rect.height });
+    await setCenterStr();
+    await setCoeffs();
+    plot();
+});
+canvas.addEventListener('wheel', async (e) => {
+    e.preventDefault();
+
+    const zoomLevel = (e.deltaY < 0) ? 1 : -1;
+
+    await invoke("zoom_view", { level: zoomLevel });
+    await setScaleStr();
+    await setCoeffs();
+    plot();
+});
