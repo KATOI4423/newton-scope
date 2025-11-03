@@ -170,29 +170,18 @@ r'_{k-1}(z) = r'_k(z)z + r_k(z)
 
 式 $(8)$ をループで計算することを考える。
 
-$s$ と $c$ はそれぞれ任意精度の浮動小数点型として与えるため、CPUで処理しなければならない。それとは異なり、$k!$ は整数型で計算できる値であり、 $z'^k_n$ はWebGLが保持するFloat型の座標値である。
+$s$ と $c$ はそれぞれ任意精度の浮動小数点型として与えるため、CPUで処理しなければならない。それとは異なり、$z'^k_n$ はWebGLが保持するFloat型の座標値である。
 
-そのため、$\{a_k\} := \{s^k f^k(c)\}$ をCPUで計算し、$z'^k_n / k!$ はGPUによって計算する。
-
-```math
-\begin{equation}
-\begin{split}
-\frac{z'^k_n}{k!} &= \frac{z'_n \cdot z'_n \cdots z'_n}{k (k-1) \cdots 3 \cdot 2 \cdot 1} \\
-                  &= \frac{z'_n}{k} \frac{z'_n}{k-1} \cdots \frac{z'_n}{3} \frac{z'_n}{2} \frac{z'_n}{1} 
-\end{split}
-\end{equation}
-```
-
-となるので、Horner' ruleによるループ計算で、$z'_n$ の代わりに $z'_n / i$ （$i$ はループカウンタ）を使用することで対応できる。
+そのため、$\{a_k\} := \{s^k f^k(c) / k! \}$ をCPUで計算し、$z'^k_n$ はGPUによって計算する。
 
 ```
-coeffs = [..]; // coeff[0]~coeff[N-1]まで. coeff[i] = f^i * s^i
+coeffs = [..]; // coeff[0]~coeff[N-1]まで. coeff[i] = f^i * s^i / i!
 f  <- coeffs[N-1];
 df <- 0;
 
 for (i = N - 2; i >= 0; --i) {
-    df <- df * z / (i + 1) + f
-    f  <-  f * z / (i + 1) + coeffs[i];
+    df <- df * z + f
+    f  <-  f * z + coeffs[i];
 }
 ```
 

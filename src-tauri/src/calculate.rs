@@ -237,15 +237,17 @@ pub fn get_coeffs() -> Vec<f32> {
     let center = f.canvas().center();
     let funcs = f.formulac().funcs();
     let mut s = 1.0;
+    let mut inv_frac = 1.0;
 
-    let mut coeffs: Vec<f32> = Vec::with_capacity(funcs.len() * 2);
-    for func in funcs {
-        let coeff = func.call(&[center]) * s;
-        coeffs.push(coeff.re.to_f32()
-            .expect(&format!("Failed to cast to f32")));
-        coeffs.push(coeff.im.to_f32()
-            .expect(&format!("Failed to cast to f32")));
+    let mut coeffs: Vec<f32> = vec![0.0; funcs.len() * 2];
+    for i in 0..funcs.len() {
+        let coeff = funcs[i].call(&[center]) * s * inv_frac;
+        coeffs[2 * i] = coeff.re.to_f32()
+            .expect(&format!("Failed to cast to f32"));
+        coeffs[2 * i + 1] = coeff.im.to_f32()
+            .expect(&format!("Failed to cast to f32"));
         s *= scale;
+        inv_frac /= (i + 1) as f64;
     }
 
     coeffs
