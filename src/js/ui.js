@@ -21,13 +21,6 @@ let prevFormula = "";
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
-import {
-    plot,
-    setCoeffs,
-    setMaxIter,
-    setViewPort,
-} from "./shader.js"
-
 // default setting
 async function setDefault(isUserClidked) {
     if (isUserClidked) {
@@ -48,9 +41,8 @@ async function setDefault(isUserClidked) {
     await setScaleStr();
 
     setSize();
-    setMaxIter(maxIter.value);
-    await setCoeffs();
-    plot();
+    // setMaxIter(maxIter.value);
+    // plot();
 }
 
 async function initialize() {
@@ -89,8 +81,7 @@ async function setFexpr() {
             fexpr.value = prevFormula;
             throw Error("Failed to set formula:", f, ret); // 例外を送信することで、エラーログに出力 & finallyの終了処理を確実に行う
         }
-        await setCoeffs();
-        plot();
+        // plot();
     } catch (e) {
         console.error(e);
     } finally {
@@ -106,13 +97,13 @@ fexpr.addEventListener('change', setFexpr);
 // link iter inputs
 iterRange.addEventListener('input', () => {
     maxIter.value = iterRange.value;
-    setMaxIter(iterRange.value);
-    plot();
+    // setMaxIter(iterRange.value);
+    // plot();
 });
 maxIter.addEventListener('change', () => {
     iterRange.value = maxIter.value;
-    setMaxIter(maxIter.value);
-    plot();
+    // setMaxIter(maxIter.value);
+    // plot();
 });
 
 function updateIterRangeBackground() {
@@ -128,12 +119,12 @@ function setSize() {
     const value = size.value;
     canvas.width = value;
     canvas.height = value;
-    setViewPort(value, value);
+    // setViewPort(value, value);
 }
 
 size.addEventListener("change", () => {
     setSize();
-    plot();
+    // plot();
 });
 
 // fractalの描写要素を正方形に保つ
@@ -184,8 +175,7 @@ canvas.addEventListener('mousemove', async (e) => {
 
     await invoke("move_view", { dx: dx/rect.width, dy: dy/rect.height });
     await setCenterStr();
-    await setCoeffs();
-    plot();
+    // plot();
 });
 canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
@@ -194,6 +184,5 @@ canvas.addEventListener('wheel', async (e) => {
 
     await invoke("zoom_view", { level: zoomLevel });
     await setScaleStr();
-    await setCoeffs();
-    plot();
+    // plot();
 });
