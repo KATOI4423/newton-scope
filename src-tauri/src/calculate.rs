@@ -2,56 +2,29 @@ use formulac;
 use num_complex::Complex;
 use num_traits::{
     Float,
-    FromPrimitive, ToPrimitive,
+    FromPrimitive,
 };
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
-/// formulacが生成する関数オブジェクトを保持する型
-macro_rules! FORMULAC_RETURN_TYPE {
-    () => { Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static> };
-}
+/// Formulacが生成する匿名関数を保持する
+type Func = Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
 
 /// 初期値
 mod default {
-    pub static FORMULAC_FUNCS_LEN: usize = 8;
     pub static CANVAS_ZOOM_LEVEL: i32 = 0;
     pub static CANVAS_SIZE: u16 = 512;
     pub static FRACTAL_MAX_ITER: u16 = 128;
 }
 
-/// formulacが生成する関数オブジェクトを静的ディスパッチで配列に格納するために、Enumを定義する
-enum Func {
-    F(FORMULAC_RETURN_TYPE!()),
-}
-
-impl Func {
-    #[inline(always)]
-    fn call(&self, args: &[Complex<f64>]) -> Complex<f64> {
-        match self {
-            Self::F(func) => func(args)
-        }
-    }
-
-    fn new() -> Self {
-        Self::F(Box::new(formulac::compile(
-            "z", &["z"],
-            &formulac::Variables::new(),
-            &formulac::UserDefinedTable::new()
-        ).unwrap()))
-    }
-
-    fn from(func: impl Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static) -> Self {
-        Func::F(Box::new(func))
-    }
-}
-
 /// formulacの変数を保持する構造体
-struct Formulac {
+struct Formulac
+{
     vars: formulac::Variables,
     usrs: formulac::UserDefinedTable,
-    funcs: [Func; default::FORMULAC_FUNCS_LEN],
+    f: Func,
+    df: Func,
 }
 
 impl Formulac {
@@ -59,7 +32,8 @@ impl Formulac {
         Self {
             vars: formulac::Variables::new(),
             usrs: formulac::UserDefinedTable::new(),
-            funcs: core::array::from_fn(|_| Func::new()),
+            f: Box::new(|_: &[Complex<f64>]| Complex::ZERO),
+            df: Box::new(|_: &[Complex<f64>]| Complex::ZERO),
         }
     }
 
@@ -76,32 +50,23 @@ impl Formulac {
     }
 
     fn set_formula(&mut self, formula: &str) -> Result<(), String> {
-        let funcs: Result<Vec<Func>, String> = (0..default::FORMULAC_FUNCS_LEN)
-            .into_par_iter()
-            .map(|i| {
-                match i {
-                    0 => Ok(Func::from(
-                        formulac::compile(formula, &["z"], &self.vars, &self.usrs)?
-                    )),
-                    i => Ok(Func::from(
-                        formulac::compile(
-                    &format!("diff({}, z, {})", formula, i),
-                    &["z"], &self.vars, &self.usrs)?
-                    ))
-                }
-            })
-            .collect();
+        let f = formulac::compile(formula, &["z"], &self.vars, &self.usrs)?;
+        let df = formulac::compile(
+            &format!("diff({}, z)", formula), &["z"], &self.vars, &self.usrs
+        )?;
 
-        self.funcs = match funcs?.try_into() {
-            Ok(array) => array,
-            Err(_) => unreachable!("length never changed"),
-        };
+        self.f = Box::new(f);
+        self.df = Box::new(df);
 
         Ok(())
     }
 
-    fn funcs(&self) -> &[Func; default::FORMULAC_FUNCS_LEN] {
-        &self.funcs
+    fn func(&self) -> &Func {
+        &self.f
+    }
+
+    fn deriv(&self) -> &Func {
+        &self.df
     }
 }
 
@@ -228,29 +193,6 @@ pub fn get_default_size() -> i32 {
 #[tauri::command]
 pub fn get_default_max_iter() -> i32 {
     default::FRACTAL_MAX_ITER.into()
-}
-
-#[tauri::command]
-pub fn get_coeffs() -> Vec<f32> {
-    let f = FRACTAL.lock().unwrap();
-    let scale = f.canvas().scale();
-    let center = f.canvas().center();
-    let funcs = f.formulac().funcs();
-    let mut s = 1.0;
-    let mut inv_frac = 1.0;
-
-    let mut coeffs: Vec<f32> = vec![0.0; funcs.len() * 2];
-    for i in 0..funcs.len() {
-        let coeff = funcs[i].call(&[center]) * s * inv_frac;
-        coeffs[2 * i] = coeff.re.to_f32()
-            .expect(&format!("Failed to cast to f32"));
-        coeffs[2 * i + 1] = coeff.im.to_f32()
-            .expect(&format!("Failed to cast to f32"));
-        s *= scale;
-        inv_frac /= (i + 1) as f64;
-    }
-
-    coeffs
 }
 
 /// 数式をformulacに設定する

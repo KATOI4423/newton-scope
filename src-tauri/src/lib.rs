@@ -13,7 +13,6 @@ pub fn run() {
       calculate::get_default_max_iter,
       calculate::get_center_str,
       calculate::get_scale_str,
-      calculate::get_coeffs,
       calculate::move_view,
       calculate::zoom_view,
     ])
