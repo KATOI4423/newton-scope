@@ -6,10 +6,10 @@ use num_traits::{
 };
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use std::sync::Mutex;
-
-/// Formulacが生成する匿名関数を保持する
-type Func = Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
+use std::sync::{
+    Arc,
+    Mutex,
+};
 
 /// 初期値
 mod default {
@@ -17,6 +17,26 @@ mod default {
     pub static CANVAS_SIZE: u16 = 512;
     pub static FRACTAL_MAX_ITER: u16 = 128;
 }
+
+/// 静的ディスパッチ用ラッパ
+struct FuncHolder<F>
+where
+    F: Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static,
+{
+    func: Arc<F>,
+}
+
+impl<F> FuncHolder<F>
+where
+    F: Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static,
+{
+    fn call(&self, args: &[Complex<f64>]) -> Complex<f64> {
+        (self.func)(args)
+    }
+}
+
+/// Formulacが生成する匿名関数を保持する
+type Func = Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
 
 /// formulacの変数を保持する構造体
 struct Formulac
@@ -55,8 +75,17 @@ impl Formulac {
             &format!("diff({}, z)", formula), &["z"], &self.vars, &self.usrs
         )?;
 
-        self.f = Box::new(f);
-        self.df = Box::new(df);
+        let f_arc = Arc::new(f);
+        let df_arc = Arc::new(df);
+
+        self.f = Box::new({
+            let f_holder = FuncHolder { func: f_arc.clone() };
+            move |args| f_holder.call(args)
+        });
+        self.df = Box::new({
+            let df_holder = FuncHolder { func: df_arc.clone() };
+            move |args| df_holder.call(args)
+        });
 
         Ok(())
     }
