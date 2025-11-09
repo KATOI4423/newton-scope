@@ -11,13 +11,17 @@ uniform float u_offset_y;
 in vec2 v_uv;
 out vec4 outColor;
 
-vec3 colormap(float t) {
-    return vec3(0.5 + 0.5*sin(6.2831 * (t + vec3(0.0, 0.33, 0.67))));
+vec3 jet(float t) {
+    t = clamp(t, 0.0, 1.0);
+    float r = clamp(1.5 - abs(4.0 * t - 3.0), 0.0, 1.0);
+    float g = clamp(1.5 - abs(4.0 * t - 2.0), 0.0, 1.0);
+    float b = clamp(1.5 - abs(4.0 * t - 1.0), 0.0, 1.0);
+    return vec3(r, g, b);
 }
 
 void main() {
     vec2 uv = v_uv + vec2(u_offset_x, u_offset_y);
     uint val = texture(u_tex, fract(uv)).r;
     float t = float(val) / u_max_iter;
-    outColor = vec4(colormap(t), 1.0);
+    outColor = vec4(jet(t), 1.0);
 }
