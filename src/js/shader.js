@@ -15,7 +15,7 @@ let offsetY = 0.0;
  * @param {string} canvasId canvas要素のID
  * @param {string} vertexPath vertex.glslのパス
  * @param {string} fragmentPath fragment.glslのパス
- * @returns {WebGL2RenderingContext} WebGL2コンテキスト
+ * @returns {void}
  */
 async function initGL(canvasId, vertexPath, fragmentPath) {
     const canvas = document.getElementById(canvasId);
@@ -36,8 +36,6 @@ async function initGL(canvasId, vertexPath, fragmentPath) {
 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(0, 0, 0, 1);
-
-    return gl;
 }
 
 /**
