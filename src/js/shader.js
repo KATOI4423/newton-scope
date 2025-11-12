@@ -1,14 +1,13 @@
 // shader.js
 
+import { setCenterStr } from "./ui.js";
+
 const invoke = window.__TAURI__.core.invoke;
 
 let gl;
 let program;
 let uniforms = {};
 let texture;
-let offsetX = 0.0;
-let offsetY = 0.0;
-
 
 /**
  * WebGL2初期化関数
@@ -132,23 +131,34 @@ function updateMaxIter(maxIter) {
 }
 
 /**
- * 水平方向のオフセットを更新
- * @param {number} offsetX 水平方向のオフセット
+ * GPUテクスチャに部分更新をかける
  * @returns {void}
  */
-function updateOffsetX(offsetX) {
-    uniforms.u_offset_x = gl.getUniformLocation(program, "u_offset_x");
-    gl.uniform1f(uniforms.u_offset_x, offsetX);
-}
+export async function updateTile() {
+    const size = document.getElementById('presetSize');
+    const sizeValue = (size.value !== "") ?
+        Number(size.value) : await invoke("get_default_size");
+    const maxIter = document.getElementById('maxIter');
+    const maxIterValue = (maxIter.value !== "") ?
+        Number(maxIter.value) : await invoke("get_default_max_iter");
 
-/**
- * 垂直方向のオフセットを更新
- * @param {number} offsetY 垂直方向のオフセット
- * @returns {void}
- */
-function updateOffsetY(offsetY) {
-    uniforms.u_offset_y = gl.getUniformLocation(program, "u_offset_y");
-    gl.uniform1f(uniforms.u_offset_y, offsetY);
+    const data = await invoke("generate_test_data", {
+        tileSize: sizeValue,
+        maxIter: maxIterValue,
+    });
+    const array = new Uint16Array(data);
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,      // level
+        0, 0,   // offset-x, offset-y
+        sizeValue,  // width
+        sizeValue,  // height
+        gl.RED_INTEGER,
+        gl.UNSIGNED_SHORT,
+        array
+    );
 }
 
 /**
@@ -157,8 +167,6 @@ function updateOffsetY(offsetY) {
  */
 function renderFrame() {
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniform1f(uniforms.u_offset_x, offsetX);
-    gl.uniform1f(uniforms.u_offset_y, offsetY);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(renderFrame);
 }
@@ -170,34 +178,16 @@ function renderFrame() {
 function setupInputHandlers() {
     const step = 0.01;
 
-    window.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowRight") offsetX += step;
-        if (e.key === "ArrowLeft")  offsetX -= step;
-        if (e.key === "ArrowUp")    offsetY += step;
-        if (e.key === "ArrowDown")  offsetY -= step;
+    window.addEventListener("keydown", async (e) => {
+        let dx = 0.0, dy = 0.0;
+        if (e.key === "ArrowRight") dx += step;
+        if (e.key === "ArrowLeft")  dx -= step;
+        if (e.key === "ArrowUp")    dy -= step;
+        if (e.key === "ArrowDown")  dy += step;
+        await invoke("move_view", {dx: dx, dy: dy});
+        await setCenterStr();
+        await updateTile();
     });
-}
-
-/**
- * テストデータ生成 // TODO: Rustでの計算結果に置き換える
- * @param {number} size 配列およびテクスチャ1辺のサイズ
- * @param {number} maxIter 最大反復回数
- * @returns {Uint16Array} 生成されたグレースケールデータ
- */
-function generateTestData(size, maxIter) {
-    const data = new Uint16Array(size * size);
-
-    for (let y = 0; y < size; ++y) {
-        const ys = y * size;
-        const dy = y / size;
-        for (let x = 0; x < size; ++x) {
-            data[ys + x] = Math.floor(
-                (0.5 + 0.5 * Math.sin((x / size) * 10.0 + dy * 6.0)) * maxIter
-            );
-        }
-    }
-
-    return data;
 }
 
 /**
@@ -205,20 +195,23 @@ function generateTestData(size, maxIter) {
  * @returns {Promise<void>}
  */
 async function main() {
-    const texSize = 512;
-    const maxIter = 4096.0;
+    const texSize = await invoke("get_default_size");
+    const maxIter = await invoke("get_default_max_iter");
 
     await initGL("fractal", "/glsl/vertex.glsl", "/glsl/fragment.glsl");
     createQuad();
 
-    const testData = generateTestData(texSize, maxIter);
-    texture = createTextureFromData(testData, texSize);
+    const testData = await invoke("generate_test_data", {
+        tileSize: texSize,
+        maxIter: maxIter,
+    });
+    const array = new Uint16Array(testData);
+    texture = createTextureFromData(array, texSize);
     updateMaxIter(maxIter);
-    updateOffsetX(offsetX);
-    updateOffsetY(offsetY);
 
     setupInputHandlers();
     renderFrame();
+    await updateTile();
 }
 
 window.addEventListener("DOMContentLoaded", main);

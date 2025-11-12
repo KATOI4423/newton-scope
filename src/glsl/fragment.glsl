@@ -5,8 +5,6 @@ precision highp usampler2D;
 
 uniform usampler2D u_tex;
 uniform float u_max_iter;
-uniform float u_offset_x;
-uniform float u_offset_y;
 
 in vec2 v_uv;
 out vec4 outColor;
@@ -20,8 +18,7 @@ vec3 jet(float t) {
 }
 
 void main() {
-    vec2 uv = v_uv + vec2(u_offset_x, u_offset_y);
-    uint val = texture(u_tex, fract(uv)).r;
+    uint val = texture(u_tex, v_uv).r;
     float t = float(val) / u_max_iter;
     outColor = vec4(jet(t), 1.0);
 }

@@ -266,3 +266,26 @@ pub fn zoom_view(level: i32) {
     let mut fractal = FRACTAL.lock().unwrap();
     fractal.canvas_mut().zoom(level);
 }
+
+#[tauri::command]
+pub fn generate_test_data(tile_size: usize, max_iter: u16) -> Vec<u16> {
+    let (center, scale) = {
+        let fractal = FRACTAL.lock().unwrap();
+        (fractal.canvas().center(), fractal.canvas().scale())
+    };
+    let mut data = vec![0u16; tile_size * tile_size];
+    const PI2: f64 = std::f64::consts::PI * 2.0;
+
+    for y in 0..tile_size {
+        let y_val = PI2 * (y as f64 / tile_size as f64) * scale + center.im;
+        let a_y = y_val.sin() + 1.0;
+        for x in 0..tile_size {
+            let x_val = PI2 * (x as f64 / tile_size as f64) * scale + center.re;
+            let a_x = x_val.sin() + 1.0;
+            let val = max_iter as f64 * a_x * a_y / 4.0;
+            data[y * tile_size + x] = val as u16;
+        }
+    }
+
+    data
+}

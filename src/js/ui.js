@@ -1,5 +1,7 @@
 // ui.js
 
+import { updateTile } from "./shader.js";
+
 const wrap = document.querySelector('.canvas-wrap');
 const canvas = document.getElementById('fractal');
 const coords = document.querySelector('.coords');
@@ -56,11 +58,11 @@ async function clickedReset() {
 resetBtn.addEventListener('click', clickedReset);
 window.addEventListener("DOMContentLoaded", initialize);
 
-async function setCenterStr() {
+export async function setCenterStr() {
     center.textContent = await invoke("get_center_str");
 }
 
-async function setScaleStr() {
+export async function setScaleStr() {
     scale.textContent = await invoke("get_scale_str");
 }
 
@@ -175,7 +177,7 @@ canvas.addEventListener('mousemove', async (e) => {
 
     await invoke("move_view", { dx: dx/rect.width, dy: dy/rect.height });
     await setCenterStr();
-    // plot();
+    await updateTile();
 });
 canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
@@ -184,5 +186,5 @@ canvas.addEventListener('wheel', async (e) => {
 
     await invoke("zoom_view", { level: zoomLevel });
     await setScaleStr();
-    // plot();
+    await updateTile();
 });
