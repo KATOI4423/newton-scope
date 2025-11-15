@@ -171,24 +171,6 @@ function renderFrame() {
     requestAnimationFrame(renderFrame);
 }
 
-/**
- * 入力処理をセットアップ
- * @returns {void}
- */
-function setupInputHandlers() {
-    const step = 0.01;
-
-    window.addEventListener("keydown", async (e) => {
-        let dx = 0.0, dy = 0.0;
-        if (e.key === "ArrowRight") dx += step;
-        if (e.key === "ArrowLeft")  dx -= step;
-        if (e.key === "ArrowUp")    dy -= step;
-        if (e.key === "ArrowDown")  dy += step;
-        await invoke("move_view", {dx: dx, dy: dy});
-        await setCenterStr();
-        await updateTile();
-    });
-}
 
 /**
  * 初期化エントリポイント
@@ -209,7 +191,6 @@ async function main() {
     texture = createTextureFromData(array, texSize);
     updateMaxIter(maxIter);
 
-    setupInputHandlers();
     renderFrame();
     await updateTile();
 }
