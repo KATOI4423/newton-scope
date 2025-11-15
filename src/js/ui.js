@@ -27,6 +27,34 @@ let prevMaxIter;
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
+
+/**
+ * 連続して呼ばれる処理を、一定間隔に1回実行する
+ * @param {Function} func 実行する処理
+ * @param {Number} interval 実行間隔[msec]
+ */
+function throttle(func, interval = 100) {
+    let lastExecTime = 0;
+    let lastArgs = null;
+    let timerId = null;
+
+    return (...args) => {
+        const now = Date.now();
+        lastArgs = args;
+
+        if (now - lastExecTime >= interval) {
+            func(...args);
+            lastExecTime = now;
+        } else {
+            clearTimeout(timerId);
+            timerId = setTimeout(() => {
+                func(...lastArgs);
+                lastExecTime = Date.now();
+            }, interval);
+        }
+    };
+}
+
 // default setting
 async function setDefault(isUserClidked) {
     if (isUserClidked) {
@@ -101,11 +129,14 @@ async function setFexpr() {
 
 fexpr.addEventListener('change', setFexpr);
 
-// link iter inputs
+const throttleSetMaxIter = throttle(async (value) => {
+    await innerSetMaxIter(value);
+}, 100);
+
 iterRange.addEventListener('input', async () => {
     let value = iterRange.valueAsNumber;
-    maxIter.value = value;
-    await innerSetMaxIter(value);
+    syncMaxIterInputs(value);
+    throttleSetMaxIter(value);
 });
 maxIter.addEventListener('change', async () => {
     let value = maxIter.valueAsNumber;
@@ -114,12 +145,19 @@ maxIter.addEventListener('change', async () => {
             `Out of range: ${maxIter.min} ~ ${maxIter.max}`,
             { title: "Failed to set Max iterations", kind: "error" }
         );
-        maxIter.value = prevMaxIter;
+        syncMaxIterInputs(prevMaxIter);
         return;
     }
-    iterRange.value = value;
+
+    syncMaxIterInputs(value);
     await innerSetMaxIter(value);
 });
+
+function syncMaxIterInputs(value) {
+    maxIter.value = value;
+    iterRange.value = value;
+    updateIterRangeBackground();
+}
 
 async function innerSetMaxIter(value) {
     try {
