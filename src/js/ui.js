@@ -24,6 +24,8 @@ const spinner = document.getElementById('spinner');
 let prevFormula = "";
 let prevMaxIter;
 
+let wheelAccum = 0;
+
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
@@ -74,6 +76,7 @@ async function setDefault(isUserClidked) {
     updateIterRangeBackground();
     await setCenterStr();
     await setScaleStr();
+    wheelAccum = 0;
 
     setSize();
     // setMaxIter(maxIter.value);
@@ -235,25 +238,38 @@ canvas.addEventListener('mouseup', () => {
 canvas.addEventListener('mouseleave', () => {
     isDragging = false;
 });
-canvas.addEventListener('mousemove', async (e) => {
-    if (!isDragging)
-        return;
 
+const throttleMoveView = throttle(async (e) => {
     const rect = canvas.getBoundingClientRect();
     const [canvasX, canvasY] = getCanvasCoordinate(e);
     const [dx, dy] = [canvasX - lastX, canvasY - lastY];
     [lastX, lastY] = [canvasX, canvasY];
 
-    await invoke("move_view", { dx: dx/rect.width, dy: dy/rect.height });
+    await invoke("move_view", { dx: dx / rect.width, dy: dy / rect.height });
     await setCenterStr();
     await updateTile();
+}, 30);
+
+canvas.addEventListener('mousemove', async (e) => {
+    if (!isDragging)
+        return;
+    throttleMoveView(e);
 });
-canvas.addEventListener('wheel', async (e) => {
-    e.preventDefault();
 
-    const zoomLevel = (e.deltaY > 0) ? 1 : -1; // 奥がズームイン,手前がズームアウト
+const throttleZoomView = throttle(async () => {
+    if (wheelAccum === 0)
+        return;
 
-    await invoke("zoom_view", { level: zoomLevel });
+    const level = (wheelAccum > 0) ? 1 : -1;
+    wheelAccum = 0;
+
+    await invoke("zoom_view", { level });
     await setScaleStr();
     await updateTile();
+}, 30);
+
+canvas.addEventListener('wheel', async (e) => {
+    e.preventDefault();
+    wheelAccum += e.deltaY;
+    throttleZoomView();
 });
