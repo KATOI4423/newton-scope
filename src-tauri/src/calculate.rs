@@ -140,6 +140,7 @@ impl<T: Float + FromPrimitive> Canvas<T> {
 struct Fractal {
     formulac:   Formulac,
     canvas:     Canvas<f64>,
+    max_iter:   u16,
 }
 
 
@@ -148,6 +149,7 @@ impl Fractal {
         Self {
             formulac:   Formulac::new(),
             canvas:     Canvas::new(),
+            max_iter:   default::FRACTAL_MAX_ITER,
         }
     }
 
@@ -165,6 +167,14 @@ impl Fractal {
 
     fn canvas_mut(&mut self) -> &mut Canvas<f64> {
         &mut self.canvas
+    }
+
+    fn set_max_iter(&mut self, max_iter: u16) {
+        self.max_iter = max_iter;
+    }
+
+    fn max_iter(&self) -> u16 {
+        self.max_iter
     }
 }
 
@@ -244,6 +254,11 @@ pub async fn set_formula(formula: String) -> String {
         Ok(ok) => ok,
         Err(e) => e.to_string(),
     }
+}
+
+#[tauri::command]
+pub fn set_max_iter(max_iter: u16) {
+    FRACTAL.lock().unwrap().set_max_iter(max_iter);
 }
 
 /// 中心座標を移動させる

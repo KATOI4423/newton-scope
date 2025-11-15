@@ -1,6 +1,9 @@
 // ui.js
 
-import { updateTile } from "./shader.js";
+import {
+    updateMaxIter,
+    updateTile,
+} from "./shader.js";
 
 const wrap = document.querySelector('.canvas-wrap');
 const canvas = document.getElementById('fractal');
@@ -19,6 +22,7 @@ const uploadBtn = document.getElementById('uploadBtn');
 const spinner = document.getElementById('spinner');
 
 let prevFormula = "";
+let prevMaxIter;
 
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
@@ -38,6 +42,7 @@ async function setDefault(isUserClidked) {
     size.value = await invoke("get_default_size");
     maxIter.value = await invoke("get_default_max_iter");
     iterRange.value = maxIter.value;
+    prevMaxIter = maxIter.value;
     updateIterRangeBackground();
     await setCenterStr();
     await setScaleStr();
@@ -97,16 +102,41 @@ async function setFexpr() {
 fexpr.addEventListener('change', setFexpr);
 
 // link iter inputs
-iterRange.addEventListener('input', () => {
-    maxIter.value = iterRange.value;
-    // setMaxIter(iterRange.value);
-    // plot();
+iterRange.addEventListener('input', async () => {
+    let value = parseInt(iterRange.value, 10);
+    maxIter.value = value;
+    await innerSetMaxIter(value);
 });
-maxIter.addEventListener('change', () => {
-    iterRange.value = maxIter.value;
-    // setMaxIter(maxIter.value);
-    // plot();
+maxIter.addEventListener('change', async () => {
+    let value = parseInt(maxIter.value, 10);
+    if (!maxIter.validity.valid) {
+        await message(
+            `Out of range: ${maxIter.min} ~ ${maxIter.max}`,
+            { title: "Failed to set Max iterations", kind: "error" }
+        );
+        maxIter.value = prevMaxIter;
+        return;
+    }
+    iterRange.value = value;
+    await innerSetMaxIter(value);
 });
+
+async function innerSetMaxIter(value) {
+    try {
+        await invoke("set_max_iter", { maxIter: value });
+        updateMaxIter(value);
+        updateTile();
+        prevMaxIter = value;
+    } catch (error) {
+        await message(
+            error,
+            { title: "Failed to set Max iterations", kind: "error" }
+        );
+        maxIter.value = prevMaxIter;
+        iterRange.value = prevMaxIter;
+        updateIterRangeBackground();
+    }
+}
 
 function updateIterRangeBackground() {
     const baseColor = '#ccc';

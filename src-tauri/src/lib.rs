@@ -7,6 +7,7 @@ pub fn run() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       calculate::set_formula,
+      calculate::set_max_iter,
       calculate::initialize,
       calculate::get_default_formula,
       calculate::get_default_size,

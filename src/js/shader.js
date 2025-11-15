@@ -125,7 +125,7 @@ function createTextureFromData(data, size) {
  * @param {number} maxIter 最大反復回数
  * @returns {void}
  */
-function updateMaxIter(maxIter) {
+export function updateMaxIter(maxIter) {
     uniforms.u_max_iter = gl.getUniformLocation(program, "u_max_iter");
     gl.uniform1f(uniforms.u_max_iter, maxIter);
 }
