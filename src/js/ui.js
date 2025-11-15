@@ -103,12 +103,12 @@ fexpr.addEventListener('change', setFexpr);
 
 // link iter inputs
 iterRange.addEventListener('input', async () => {
-    let value = parseInt(iterRange.value, 10);
+    let value = iterRange.valueAsNumber;
     maxIter.value = value;
     await innerSetMaxIter(value);
 });
 maxIter.addEventListener('change', async () => {
-    let value = parseInt(maxIter.value, 10);
+    let value = maxIter.valueAsNumber;
     if (!maxIter.validity.valid) {
         await message(
             `Out of range: ${maxIter.min} ~ ${maxIter.max}`,
