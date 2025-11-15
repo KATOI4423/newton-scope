@@ -116,6 +116,7 @@ function updateIterRangeBackground() {
     iterRange.style.background = `linear-gradient(to right, ${activeColor} ${progress}%, ${baseColor} ${progress}%)`;
 }
 iterRange.addEventListener('input', updateIterRangeBackground);
+maxIter.addEventListener('change', updateIterRangeBackground);
 
 function setSize() {
     const value = size.value;
