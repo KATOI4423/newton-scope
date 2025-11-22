@@ -17,7 +17,7 @@ const maxIter = document.getElementById('maxIter');
 const iterRange = document.getElementById('iterRange');
 const resetBtn = document.getElementById('resetBtn');
 const saveBtn = document.getElementById('saveBtn');
-const uploadBtn = document.getElementById('uploadBtn');
+const importBtn = document.getElementById('importBtn');
 
 const spinner = document.getElementById('spinner');
 
