@@ -118,7 +118,7 @@ async function setFexpr() {
             fexpr.value = prevFormula;
             throw Error("Failed to set formula:", f, ret); // 例外を送信することで、エラーログに出力 & finallyの終了処理を確実に行う
         }
-        // plot();
+        updateTile();
     } catch (e) {
         console.error(e);
     } finally {
