@@ -130,9 +130,21 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.zoom_level += level;
     }
 
-    fn scale(&self) -> f64 {
-        const STEP: f64 = 1.0 / 8.0;
-        2.0f64.powf(self.zoom_level as f64 * STEP)
+    fn zoom_step() -> f64 {
+        const STEP:f64 = 1.0 / 8.0;
+        STEP
+    }
+
+    fn width(&self) -> T {
+        // 2.0 * 2.0^(-zoom_level * zoom_step) = 2.0^(-zoom_level * zoom_step + 1)
+        //  └> [-1.0, 1.0].width() = 2.0
+        T::from_f64(2.0f64.powf(-self.zoom_level as f64 * Self::zoom_step() + 1.0))
+            .unwrap_or_else(|| T::nan())
+    }
+
+    fn scale(&self) -> T {
+        T::from_f64(2.0f64.powf(self.zoom_level as f64 * Self::zoom_step()))
+            .unwrap_or_else(|| T::nan())
     }
 }
 
@@ -264,37 +276,40 @@ pub fn set_max_iter(max_iter: u16) {
 #[tauri::command]
 pub fn move_view(dx: f64, dy: f64) {
     let mut fractal = FRACTAL.lock().unwrap();
-    let scale = fractal.canvas().scale();
+    let width = fractal.canvas().width();
     let center = fractal.canvas().center();
-    const WIDTH: f64 = 2.0; // [-1: 1]の幅
 
     fractal.canvas_mut().set_center(
-        center.re - dx * scale * WIDTH,
-        center.im + dy * scale * WIDTH
+        center.re - dx * width,
+        center.im + dy * width
     );
 }
 
-/// 縮尺を変更する
+/// # 縮尺を変更する
+///
+/// # Returns:
+/// - 成功: "OK"
+/// - エラー: "<エラーメッセージ>"
 #[tauri::command]
 pub fn zoom_view(level: i32) {
     let mut fractal = FRACTAL.lock().unwrap();
-    fractal.canvas_mut().zoom(level);
+
+    fractal.canvas_mut().zoom(level)
 }
 
 #[tauri::command]
 pub fn generate_test_data(tile_size: usize, max_iter: u16) -> Vec<u16> {
-    let (center, scale) = {
+    let (center, width) = {
         let fractal = FRACTAL.lock().unwrap();
-        (fractal.canvas().center(), fractal.canvas().scale())
+        (fractal.canvas().center(), fractal.canvas().width())
     };
     let mut data = vec![0u16; tile_size * tile_size];
-    const PI2: f64 = std::f64::consts::PI * 2.0;
 
     for y in 0..tile_size {
-        let y_val = PI2 * (y as f64 / tile_size as f64) * scale + center.im;
+        let y_val = (y as f64 / tile_size as f64 - 0.5) * width + center.im;
         let a_y = y_val.sin() + 1.0;
         for x in 0..tile_size {
-            let x_val = PI2 * (x as f64 / tile_size as f64) * scale + center.re;
+            let x_val = (x as f64 / tile_size as f64 - 0.5) * width + center.re;
             let a_x = x_val.sin() + 1.0;
             let val = max_iter as f64 * a_x * a_y / 4.0;
             data[y * tile_size + x] = val as u16;
