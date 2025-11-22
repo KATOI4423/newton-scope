@@ -70,17 +70,16 @@ async function setDefault(isUserClidked) {
     fexpr.value = await invoke("get_default_formula");
     prevFormula = fexpr.value;
     size.value = await invoke("get_default_size");
-    maxIter.value = await invoke("get_default_max_iter");
-    iterRange.value = maxIter.value;
-    prevMaxIter = maxIter.value;
-    updateIterRangeBackground();
+    const maxIterValue = await invoke("get_default_max_iter");
+    syncMaxIterInputs(maxIterValue);
+    updateMaxIter(maxIterValue);
+    prevMaxIter = maxIterValue;
     await setCenterStr();
     await setScaleStr();
     wheelAccum = 0;
 
     setSize();
-    // setMaxIter(maxIter.value);
-    // plot();
+    await updateTile();
 }
 
 async function initialize() {
