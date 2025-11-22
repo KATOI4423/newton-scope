@@ -259,7 +259,7 @@ const throttleZoomView = throttle(async () => {
     if (wheelAccum === 0)
         return;
 
-    const level = (wheelAccum > 0) ? 1 : -1;
+    const level = (wheelAccum > 0) ? -1 : 1;
     wheelAccum = 0;
 
     await invoke("zoom_view", { level });
