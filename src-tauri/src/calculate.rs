@@ -102,7 +102,7 @@ impl Formulac {
 
 
 /// 複素数平面の情報を保持する構造体
-struct Canvas<T> 
+struct Canvas<T>
     where T: Float + FromPrimitive,
 {
     center: num_complex::Complex<T>,
@@ -234,7 +234,7 @@ pub fn get_default_max_iter() -> i32 {
 }
 
 /// 数式をformulacに設定する
-/// 
+///
 /// # Returns:
 /// - 成功: "OK"
 /// - エラー: "<エラーメッセージ>"
