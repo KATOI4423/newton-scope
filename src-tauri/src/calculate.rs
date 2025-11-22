@@ -13,9 +13,10 @@ use std::sync::{
 
 /// 初期値
 mod default {
-    pub static CANVAS_ZOOM_LEVEL: i32 = 0;
-    pub static CANVAS_SIZE: u16 = 512;
-    pub static FRACTAL_MAX_ITER: u16 = 128;
+    pub const FORMULA: &str = "z^3 - 1";
+    pub const CANVAS_ZOOM_LEVEL: i32 = 0;
+    pub const CANVAS_SIZE: u16 = 512;
+    pub const FRACTAL_MAX_ITER: u16 = 128;
 }
 
 /// 静的ディスパッチ用ラッパ
@@ -178,8 +179,6 @@ impl Fractal {
     }
 }
 
-/// 初期数式
-static FORMULA: &str = "z^3 - 1";
 
 static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
     Mutex::new(Fractal::new())
@@ -189,14 +188,14 @@ static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
 #[tauri::command]
 pub fn initialize() {
     let mut fractal = Fractal::new();
-    fractal.formulac_mut().set_formula(FORMULA).unwrap();
+    fractal.formulac_mut().set_formula(default::FORMULA).unwrap();
 
     *FRACTAL.lock().unwrap() = fractal;
 }
 
 #[tauri::command]
 pub fn get_default_formula() -> String {
-    FORMULA.to_string()
+    default::FORMULA.to_string()
 }
 
 /// 指数表記の際に、小数点がない場合は ".0" を追加する
