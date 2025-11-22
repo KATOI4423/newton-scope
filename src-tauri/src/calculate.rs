@@ -37,7 +37,7 @@ where
 }
 
 /// Formulacが生成する匿名関数を保持する
-type Func = Box<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
+type Func = Arc<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
 
 /// formulacの変数を保持する構造体
 struct Formulac
@@ -53,8 +53,8 @@ impl Formulac {
         Self {
             vars: formulac::Variables::new(),
             usrs: formulac::UserDefinedTable::new(),
-            f: Box::new(|_: &[Complex<f64>]| Complex::ZERO),
-            df: Box::new(|_: &[Complex<f64>]| Complex::ZERO),
+            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
         }
     }
 
@@ -79,11 +79,11 @@ impl Formulac {
         let f_arc = Arc::new(f);
         let df_arc = Arc::new(df);
 
-        self.f = Box::new({
+        self.f = Arc::new({
             let f_holder = FuncHolder { func: f_arc.clone() };
             move |args| f_holder.call(args)
         });
-        self.df = Box::new({
+        self.df = Arc::new({
             let df_holder = FuncHolder { func: df_arc.clone() };
             move |args| df_holder.call(args)
         });
