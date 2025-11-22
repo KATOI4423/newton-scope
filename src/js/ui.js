@@ -255,20 +255,24 @@ canvas.addEventListener('mousemove', async (e) => {
     throttleMoveView(e);
 });
 
-const throttleZoomView = throttle(async () => {
+const throttleZoomView = throttle(async (e) => {
     if (wheelAccum === 0)
         return;
 
     const level = (wheelAccum > 0) ? -1 : 1;
     wheelAccum = 0;
 
-    await invoke("zoom_view", { level });
+    const rect = canvas.getBoundingClientRect();
+    const [canvasX, canvasY] = getCanvasCoordinate(e);
+
+    await invoke("zoom_view", { level, x: canvasX / rect.width, y: canvasY / rect.height });
     await setScaleStr();
+    await setCenterStr();
     await updateTile();
 }, 30);
 
 canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
     wheelAccum += e.deltaY;
-    throttleZoomView();
+    throttleZoomView(e);
 });

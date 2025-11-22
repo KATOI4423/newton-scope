@@ -122,6 +122,29 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         self.center.im = im;
     }
 
+    /// # ズーム後にマウス位置が動かないようにズームする
+    ///
+    /// ## Params
+    ///  - level: ズーム段階
+    ///  - mouse_x_ratio: マウスのx座標 [0.0, 1.0]
+    ///  - mouse_y_ratio: マウスのy座標 [0.0, 1.0]
+    fn zoom_around_point(&mut self, level: i32, mouse_x_ratio: f64, mouse_y_ratio: f64) {
+        let old_width = self.width();
+
+        self.zoom(level);
+        let new_width = self.width();
+
+        let d_width = old_width - new_width;
+
+        // 座標中心は0.5なので、マウスの座標の偏差によって補正する
+        let delta = Complex::new(
+            d_width * T::from_f64(mouse_x_ratio - 0.5).unwrap(),
+            d_width * T::from_f64(0.5 - mouse_y_ratio).unwrap()
+        );
+
+        self.center = self.center + delta;
+    }
+
     fn center(&self) -> num_complex::Complex<T> {
         self.center
     }
@@ -291,10 +314,10 @@ pub fn move_view(dx: f64, dy: f64) {
 /// - 成功: "OK"
 /// - エラー: "<エラーメッセージ>"
 #[tauri::command]
-pub fn zoom_view(level: i32) {
+pub fn zoom_view(level: i32, x: f64, y: f64) {
     let mut fractal = FRACTAL.lock().unwrap();
 
-    fractal.canvas_mut().zoom(level)
+    fractal.canvas_mut().zoom_around_point(level, x, y);
 }
 
 #[tauri::command]
