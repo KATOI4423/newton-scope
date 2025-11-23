@@ -57,6 +57,32 @@ function throttle(func, interval = 100) {
     };
 }
 
+/**
+ * 一定時間経過しても処理が完了しない場合、スピナーを表示する
+ * @param {Function} func 実行する処理
+ * @param {Number} delayMsec スピナーを表示するまでの時間[msec]
+ */
+async function setSpinner(func, delayMsec = 500) {
+    let showSpinner = true;
+    const timer = setTimeout(() => {
+        if (!showSpinner)
+            return;
+
+        spinner.style.display = "flex";
+        console.info("The operation is taking longer than expected...");
+    }, delayMsec);
+
+    try {
+        await func();
+    } catch (e) {
+        console.error(e);
+    } finally {
+        showSpinner = false;
+        clearTimeout(timer);
+        spinner.style.display = "none";
+    }
+}
+
 // default setting
 async function setDefault(isUserClidked) {
     if (isUserClidked) {
@@ -102,31 +128,18 @@ export async function setScaleStr() {
 }
 
 async function setFexpr() {
-    const f = fexpr.value;
-
-    const delayMsec = 500;
-    let showSpinner = true;
-    const timer = setTimeout(() => {
-        if (showSpinner) spinner.style.display = "flex";
-    }, delayMsec);
-
-    try {
-        const ret = await invoke("set_formula", {formula: f});
+    await setSpinner(async () => {
+        const f = fexpr.value;
+        const ret = await invoke("set_formula", { formula: f });
         if (ret !== "OK") {
-            showSpinner = false; // エラー時はスピナー表示を止める
-            await message(ret, {title: "Failed to set f(z)", kind: "error"});
             fexpr.value = prevFormula;
-            throw Error("Failed to set formula:", f, ret); // 例外を送信することで、エラーログに出力 & finallyの終了処理を確実に行う
+            await message(ret, { title: "Failed to set f(z)", kind: "error" });
+            throw Error("Failed to set formula", f, ret);
         }
-        updateTile();
-    } catch (e) {
-        console.error(e);
-    } finally {
-        showSpinner = false;
-        clearTimeout(timer);
-        spinner.style.display = "none";
+
+        await updateTile();
         prevFormula = f;
-    }
+    });
 }
 
 fexpr.addEventListener('change', setFexpr);
@@ -165,7 +178,7 @@ async function innerSetMaxIter(value) {
     try {
         await invoke("set_max_iter", { maxIter: value });
         updateMaxIter(value);
-        updateTile();
+        await updateTile();
         prevMaxIter = value;
     } catch (error) {
         await message(
