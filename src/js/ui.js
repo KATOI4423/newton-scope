@@ -105,7 +105,7 @@ async function setDefault(isUserClidked) {
     wheelAccum = 0;
 
     setSize();
-    await updateTile();
+    await setSpinner(updateTile);
 }
 
 async function initialize() {
@@ -178,7 +178,7 @@ async function innerSetMaxIter(value) {
     try {
         await invoke("set_max_iter", { maxIter: value });
         updateMaxIter(value);
-        await updateTile();
+        await setSpinner(updateTile);
         prevMaxIter = value;
     } catch (error) {
         await message(
@@ -259,7 +259,7 @@ const throttleMoveView = throttle(async (e) => {
 
     await invoke("move_view", { dx: dx / rect.width, dy: dy / rect.height });
     await setCenterStr();
-    await updateTile();
+    await setSpinner(updateTile);
 }, 30);
 
 canvas.addEventListener('mousemove', async (e) => {
@@ -281,7 +281,7 @@ const throttleZoomView = throttle(async (e) => {
     await invoke("zoom_view", { level, x: canvasX / rect.width, y: canvasY / rect.height });
     await setScaleStr();
     await setCenterStr();
-    await updateTile();
+    await setSpinner(updateTile);
 }, 30);
 
 canvas.addEventListener('wheel', async (e) => {
