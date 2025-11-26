@@ -107,6 +107,7 @@ struct Canvas<T>
 {
     center: num_complex::Complex<T>,
     zoom_level:  i32,
+    size: u16,
 }
 
 impl<T: Float + FromPrimitive> Canvas<T> {
@@ -114,12 +115,17 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         Self {
             center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
             zoom_level: default::CANVAS_ZOOM_LEVEL,
+            size: default::CANVAS_SIZE,
         }
     }
 
     fn set_center(&mut self, re: T, im: T) {
         self.center.re = re;
         self.center.im = im;
+    }
+
+    fn set_size(&mut self, size: u16) {
+        self.size = size;
     }
 
     /// # ズーム後にマウス位置が動かないようにズームする
@@ -147,6 +153,10 @@ impl<T: Float + FromPrimitive> Canvas<T> {
 
     fn center(&self) -> num_complex::Complex<T> {
         self.center
+    }
+
+    fn size(&self) -> u16 {
+        self.size
     }
 
     fn zoom(&mut self, level: i32) {
@@ -264,6 +274,12 @@ pub fn get_default_size() -> i32 {
 }
 
 #[tauri::command]
+pub fn get_size() -> i32 {
+    FRACTAL.lock().unwrap()
+        .canvas().size().into()
+}
+
+#[tauri::command]
 pub fn get_default_max_iter() -> i32 {
     default::FRACTAL_MAX_ITER.into()
 }
@@ -293,6 +309,12 @@ pub async fn set_formula(formula: String) -> String {
 #[tauri::command]
 pub fn set_max_iter(max_iter: u16) {
     FRACTAL.lock().unwrap().set_max_iter(max_iter);
+}
+
+#[tauri::command]
+pub fn set_size(size: u16) {
+    FRACTAL.lock().unwrap()
+        .canvas_mut().set_size(size);
 }
 
 /// 中心座標を移動させる

@@ -3,6 +3,7 @@
 import {
     updateMaxIter,
     updateTile,
+    createTextureFromData,
 } from "./shader.js";
 
 const wrap = document.querySelector('.canvas-wrap');
@@ -104,7 +105,7 @@ async function setDefault(isUserClidked) {
     await setScaleStr();
     wheelAccum = 0;
 
-    setSize();
+    await setSize();
     await setSpinner(updateTile);
 }
 
@@ -201,16 +202,17 @@ function updateIterRangeBackground() {
 iterRange.addEventListener('input', updateIterRangeBackground);
 maxIter.addEventListener('change', updateIterRangeBackground);
 
-function setSize() {
-    const value = size.value;
+async function setSize() {
+    const value = Number(size.value);
     canvas.width = value;
     canvas.height = value;
-    // setViewPort(value, value);
+    createTextureFromData(null, value);
+    await invoke("set_size", { size: value });
 }
 
-size.addEventListener("change", () => {
-    setSize();
-    // plot();
+size.addEventListener("change", async () => {
+    await setSize();
+    await setSpinner(updateTile);
 });
 
 // fractalの描写要素を正方形に保つ

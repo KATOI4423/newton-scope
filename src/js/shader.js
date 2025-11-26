@@ -98,7 +98,7 @@ function createQuad() {
  * @param {number} size テクスチャ1辺のサイズ
  * @returns {WebGLTexture} 生成されたテクスチャ
  */
-function createTextureFromData(data, size) {
+export function createTextureFromData(data, size) {
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -115,6 +115,7 @@ function createTextureFromData(data, size) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
+    texture = tex;
     return tex;
 }
 
@@ -186,7 +187,7 @@ async function main() {
         maxIter: maxIter,
     });
     const array = new Uint16Array(testData);
-    texture = createTextureFromData(array, texSize);
+    createTextureFromData(array, texSize);
     updateMaxIter(maxIter);
 
     renderFrame();
