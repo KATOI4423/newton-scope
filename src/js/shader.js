@@ -134,13 +134,7 @@ export function updateMaxIter(maxIter) {
  * @returns {void}
  */
 export async function updateTile() {
-    const size = document.getElementById('presetSize');
-    const sizeValue = (size.value !== "") ?
-        Number(size.value) : await invoke("get_default_size");
-    const maxIter = document.getElementById('maxIter');
-    const maxIterValue = (maxIter.value !== "") ?
-        Number(maxIter.value) : await invoke("get_default_max_iter");
-
+    const size = await invoke("get_size");
     const data = await invoke("generate_test_data");
     const array = new Uint16Array(data);
 
@@ -149,8 +143,8 @@ export async function updateTile() {
         gl.TEXTURE_2D,
         0,      // level
         0, 0,   // offset-x, offset-y
-        sizeValue,  // width
-        sizeValue,  // height
+        size,   // width
+        size,   // height
         gl.RED_INTEGER,
         gl.UNSIGNED_SHORT,
         array
