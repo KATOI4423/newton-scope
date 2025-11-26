@@ -141,10 +141,7 @@ export async function updateTile() {
     const maxIterValue = (maxIter.value !== "") ?
         Number(maxIter.value) : await invoke("get_default_max_iter");
 
-    const data = await invoke("generate_test_data", {
-        tileSize: sizeValue,
-        maxIter: maxIterValue,
-    });
+    const data = await invoke("generate_test_data");
     const array = new Uint16Array(data);
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -182,10 +179,7 @@ async function main() {
     await initGL("fractal", "/glsl/vertex.glsl", "/glsl/fragment.glsl");
     createQuad();
 
-    const testData = await invoke("generate_test_data", {
-        tileSize: texSize,
-        maxIter: maxIter,
-    });
+    const testData = await invoke("generate_test_data");
     const array = new Uint16Array(testData);
     createTextureFromData(array, texSize);
     updateMaxIter(maxIter);

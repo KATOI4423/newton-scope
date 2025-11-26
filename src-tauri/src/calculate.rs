@@ -343,21 +343,37 @@ pub fn zoom_view(level: i32, x: f64, y: f64) {
 }
 
 #[tauri::command]
-pub fn generate_test_data(tile_size: usize, max_iter: u16) -> Vec<u16> {
-    let (center, width) = {
+pub fn generate_test_data() -> Vec<u16> {
+    let (
+        center,
+        width,
+        max_iter,
+        size,
+        f,
+        df,
+    ) = {
         let fractal = FRACTAL.lock().unwrap();
-        (fractal.canvas().center(), fractal.canvas().width())
+        (
+            fractal.canvas().center(),
+            fractal.canvas().width(),
+            fractal.max_iter(),
+            fractal.canvas().size(),
+            fractal.formulac().func().clone(),
+            fractal.formulac().deriv().clone(),
+        )
     };
-    let mut data = vec![0u16; tile_size * tile_size];
+    let mut data = vec![0u16; size as usize * size as usize];
 
-    for y in 0..tile_size {
-        let y_val = (y as f64 / tile_size as f64 - 0.5) * width + center.im;
-        let a_y = y_val.sin() + 1.0;
-        for x in 0..tile_size {
-            let x_val = (x as f64 / tile_size as f64 - 0.5) * width + center.re;
-            let a_x = x_val.sin() + 1.0;
-            let val = max_iter as f64 * a_x * a_y / 4.0;
-            data[y * tile_size + x] = val as u16;
+    for y in 0..size {
+        let y_val = (y as f64 / size as f64 - 0.5) * width + center.im;
+        let a_y = f(&[y_val.into()]).norm();
+        let i_y = y as usize * size as usize;
+        for x in 0..size {
+            let x_val = (x as f64 / size as f64 - 0.5) * width + center.re;
+            let a_x = df(&[x_val.into()]).norm();
+            let val = ((a_x * a_y) % max_iter as f64) as u16;
+            let idx = i_y + x as usize;
+            data[idx] = val;
         }
     }
 
