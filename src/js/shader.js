@@ -1,7 +1,5 @@
 // shader.js
 
-import { setCenterStr } from "./ui.js";
-
 const invoke = window.__TAURI__.core.invoke;
 
 let gl;
