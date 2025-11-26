@@ -20,7 +20,7 @@ async function initGL(canvasId, vertexPath, fragmentPath) {
     if (!gl) {
         throw new Error("WebGL2 not supported");
     }
-    
+
     const [vsSource, fsSource] = await Promise.all([
         fetch(vertexPath).then(r => r.text()),
         fetch(fragmentPath).then(r => r.text())
