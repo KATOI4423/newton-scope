@@ -5,7 +5,7 @@ const invoke = window.__TAURI__.core.invoke;
 let gl;
 let program;
 let uniforms = {};
-let texture;
+let texture = null;
 
 /**
  * WebGL2初期化関数
@@ -92,31 +92,75 @@ function createQuad() {
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 }
 
-/**
- * Uint16ArrayからR16UIテクスチャを生成
- * @param {Uint16Array} data 16bit符号なし整数配列データ
- * @param {number} size テクスチャ1辺のサイズ
- * @returns {WebGLTexture} 生成されたテクスチャ
- */
-export function createTextureFromData(data, size) {
-    const tex = gl.createTexture();
+function initTexture() {
+    if (texture) {
+        gl.deleteTexture(texture);
+    }
+    texture = gl.createTexture();
+
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
 
     uniforms.u_tex = gl.getUniformLocation(program, "u_tex");
     gl.uniform1i(uniforms.u_tex, 0);
 
-    gl.texImage2D(
-        gl.TEXTURE_2D, 0, gl.R16UI, size, size, 0,
-        gl.RED_INTEGER, gl.UNSIGNED_SHORT, data
-    );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    texture = tex;
-    return tex;
+    // Uint16Array (2Byte) のデータ転送時、幅が奇数だとアライメントズレが発生するため、
+    // パッキングのアライメントを 1Byte に設定して防ぐ
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+}
+
+/**
+ * テクスチャのメモリ領域をsizeに応じて確保する
+ * データ転送は行わず、VRAMの確保のみを行う
+ * @param {number} size
+ */
+export function resizeTexture(size) {
+    if (!texture) {
+        initTexture();
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.R16UI,
+        size,
+        size,
+        0,
+        gl.RED_INTEGER,
+        gl.UNSIGNED_SHORT,
+        null // メモリ確保だけを行うため null にする
+    );
+}
+
+/**
+ * テクスチャにデータをアップロードする
+ * @param {Uint16Array} data 更新するピクセルデータ
+ * @param {number} width データの幅 (x方向)
+ * @param {number} height データの高さ (y方向)
+ * @param {number} x 更新開始位置 (default: 0)
+ * @param {number} y 更新開始位置 (default: 0)
+ */
+export function updateTexture(data, width, height, x = 0, y = 0) {
+    if (!texture) {
+        return;
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,      // level
+        x, y,   // offset
+        width, height,
+        gl.RED_INTEGER,
+        gl.UNSIGNED_SHORT,
+        data
+    );
 }
 
 /**
@@ -147,17 +191,7 @@ export async function updateTile() {
     const data = await invoke("generate_test_data");
     const array = new Uint16Array(data);
 
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texSubImage2D(
-        gl.TEXTURE_2D,
-        0,      // level
-        0, 0,   // offset-x, offset-y
-        size,   // width
-        size,   // height
-        gl.RED_INTEGER,
-        gl.UNSIGNED_SHORT,
-        array
-    );
+    updateTexture(array, size, size, 0, 0);
 }
 
 /**
@@ -182,13 +216,12 @@ async function main() {
     await initGL("fractal", "/glsl/vertex.glsl", "/glsl/fragment.glsl");
     createQuad();
 
-    const testData = await invoke("generate_test_data");
-    const array = new Uint16Array(testData);
-    createTextureFromData(array, texSize);
+    initTexture();
+    resizeTexture(texSize);
     updateMaxIter(maxIter);
 
-    renderFrame();
     await updateTile();
+    renderFrame();
 }
 
 window.addEventListener("DOMContentLoaded", main);

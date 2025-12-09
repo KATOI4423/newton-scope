@@ -1,10 +1,10 @@
 // ui.js
 
 import {
+    resizeTexture,
     updateMaxIter,
     updateViewport,
     updateTile,
-    createTextureFromData,
 } from "./shader.js";
 
 const wrap = document.querySelector('.canvas-wrap');
@@ -208,7 +208,7 @@ async function setSize() {
     canvas.width = value;
     canvas.height = value;
     updateViewport(value);
-    createTextureFromData(null, value);
+    resizeTexture(value);
     await invoke("set_size", { size: value });
 }
 
