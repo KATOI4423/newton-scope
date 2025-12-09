@@ -7,21 +7,23 @@ import {
     updateTile,
 } from "./shader.js";
 
-const wrap = document.querySelector('.canvas-wrap');
-const canvas = document.getElementById('fractal');
-const coords = document.querySelector('.coords');
-const center = document.getElementById('center');
-const scale = document.getElementById('scale');
+/* DOM Elements */
+const elements = {
+    wrap:       document.querySelector('.canvas-wrap'),
+    canvas:     document.getElementById('fractal'),
+    coords:     document.querySelector('.coords'),
+    center:     document.getElementById('center'),
+    scale:      document.getElementById('scale'),
+    fexpr:      document.getElementById('fexpr'),
+    presetSize: document.getElementById('presetSize'),
+    maxIter:    document.getElementById('maxIter'),
+    iterRange:  document.getElementById('iterRange'),
+    resetBtn:   document.getElementById('resetBtn'),
+    saveBtn:    document.getElementById('saveBtn'),
+    importBtn:  document.getElementById('importBtn'),
+    spinner:    document.getElementById('spinner'),
+};
 
-const fexpr = document.getElementById('fexpr');
-const size = document.getElementById('presetSize');
-const maxIter = document.getElementById('maxIter');
-const iterRange = document.getElementById('iterRange');
-const resetBtn = document.getElementById('resetBtn');
-const saveBtn = document.getElementById('saveBtn');
-const importBtn = document.getElementById('importBtn');
-
-const spinner = document.getElementById('spinner');
 
 let prevFormula = "";
 let prevMaxIter;
@@ -70,7 +72,7 @@ async function setSpinner(func, delayMsec = 500) {
         if (!showSpinner)
             return;
 
-        spinner.style.display = "flex";
+        elements.spinner.style.display = "flex";
         console.info("The operation is taking longer than expected...");
     }, delayMsec);
 
@@ -81,7 +83,7 @@ async function setSpinner(func, delayMsec = 500) {
     } finally {
         showSpinner = false;
         clearTimeout(timer);
-        spinner.style.display = "none";
+        elements.spinner.style.display = "none";
     }
 }
 
@@ -95,9 +97,9 @@ async function setDefault(isUserClidked) {
     }
 
     await invoke("initialize");
-    fexpr.value = await invoke("get_default_formula");
-    prevFormula = fexpr.value;
-    size.value = await invoke("get_default_size");
+    elements.fexpr.value = await invoke("get_default_formula");
+    prevFormula = elements.fexpr.value;
+    elements.presetSize.value = await invoke("get_default_size");
     const maxIterValue = await invoke("get_default_max_iter");
     syncMaxIterInputs(maxIterValue);
     updateMaxIter(maxIterValue);
@@ -118,23 +120,23 @@ async function clickedReset() {
     await setDefault(true);
 }
 
-resetBtn.addEventListener('click', clickedReset);
+elements.resetBtn.addEventListener('click', clickedReset);
 window.addEventListener("DOMContentLoaded", initialize);
 
 export async function setCenterStr() {
-    center.textContent = await invoke("get_center_str");
+    elements.center.textContent = await invoke("get_center_str");
 }
 
 export async function setScaleStr() {
-    scale.textContent = await invoke("get_scale_str");
+    elements.scale.textContent = await invoke("get_scale_str");
 }
 
 async function setFexpr() {
     await setSpinner(async () => {
-        const f = fexpr.value;
+        const f = elements.fexpr.value;
         const ret = await invoke("set_formula", { formula: f });
         if (ret !== "OK") {
-            fexpr.value = prevFormula;
+            elements.fexpr.value = prevFormula;
             await message(ret, { title: "Failed to set f(z)", kind: "error" });
             throw Error("Failed to set formula", f, ret);
         }
@@ -144,22 +146,22 @@ async function setFexpr() {
     });
 }
 
-fexpr.addEventListener('change', setFexpr);
+elements.fexpr.addEventListener('change', setFexpr);
 
 const throttleSetMaxIter = throttle(async (value) => {
     await innerSetMaxIter(value);
 }, 100);
 
-iterRange.addEventListener('input', async () => {
-    let value = iterRange.valueAsNumber;
+elements.iterRange.addEventListener('input', async () => {
+    let value = elements.iterRange.valueAsNumber;
     syncMaxIterInputs(value);
     throttleSetMaxIter(value);
 });
-maxIter.addEventListener('change', async () => {
-    let value = maxIter.valueAsNumber;
-    if (!maxIter.validity.valid) {
+elements.maxIter.addEventListener('change', async () => {
+    let value = elements.maxIter.valueAsNumber;
+    if (!elements.maxIter.validity.valid) {
         await message(
-            `Out of range: ${maxIter.min} ~ ${maxIter.max}`,
+            `Out of range: ${elements.maxIter.min} ~ ${elements.maxIter.max}`,
             { title: "Failed to set Max iterations", kind: "error" }
         );
         syncMaxIterInputs(prevMaxIter);
@@ -171,8 +173,8 @@ maxIter.addEventListener('change', async () => {
 });
 
 function syncMaxIterInputs(value) {
-    maxIter.value = value;
-    iterRange.value = value;
+    elements.maxIter.value = value;
+    elements.iterRange.value = value;
     updateIterRangeBackground();
 }
 
@@ -187,8 +189,8 @@ async function innerSetMaxIter(value) {
             error,
             { title: "Failed to set Max iterations", kind: "error" }
         );
-        maxIter.value = prevMaxIter;
-        iterRange.value = prevMaxIter;
+        elements.maxIter.value = prevMaxIter;
+        elements.iterRange.value = prevMaxIter;
         updateIterRangeBackground();
     }
 }
@@ -197,37 +199,37 @@ function updateIterRangeBackground() {
     const baseColor = '#ccc';
     const activeColor = '#ff4500';
 
-    const progress = (iterRange.value / iterRange.max) * 100;
-    iterRange.style.background = `linear-gradient(to right, ${activeColor} ${progress}%, ${baseColor} ${progress}%)`;
+    const progress = (elements.iterRange.value / elements.iterRange.max) * 100;
+    elements.iterRange.style.background = `linear-gradient(to right, ${activeColor} ${progress}%, ${baseColor} ${progress}%)`;
 }
-iterRange.addEventListener('input', updateIterRangeBackground);
-maxIter.addEventListener('change', updateIterRangeBackground);
+elements.iterRange.addEventListener('input', updateIterRangeBackground);
+elements.maxIter.addEventListener('change', updateIterRangeBackground);
 
 async function setSize() {
-    const value = Number(size.value);
-    canvas.width = value;
-    canvas.height = value;
+    const value = Number(elements.presetSize.value);
+    elements.canvas.width = value;
+    elements.canvas.height = value;
     updateViewport(value);
     resizeTexture(value);
     await invoke("set_size", { size: value });
 }
 
-size.addEventListener("change", async () => {
+elements.presetSize.addEventListener("change", async () => {
     await setSize();
     await setSpinner(updateTile);
 });
 
 // fractalの描写要素を正方形に保つ
 function adjustCanvasSize() {
-    const wrapRect = wrap.getBoundingClientRect();
-    const coordsRect = coords.getBoundingClientRect();
+    const wrapRect = elements.wrap.getBoundingClientRect();
+    const coordsRect = elements.coords.getBoundingClientRect();
 
     const availableHeight = wrapRect.height - coordsRect.height;
     const availableWidth = wrapRect.width;
 
     const size = Math.min(availableWidth, availableHeight);
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    elements.canvas.style.width = `${size}px`;
+    elements.canvas.style.height = `${size}px`;
 }
 
 window.addEventListener("load", adjustCanvasSize);
@@ -238,25 +240,25 @@ let lastX = 0;
 let lastY = 0;
 
 function getCanvasCoordinate(mouseEvent) {
-    const rect = canvas.getBoundingClientRect();
+    const rect = elements.canvas.getBoundingClientRect();
     return [mouseEvent.clientX - rect.left, mouseEvent.clientY - rect.top];
 }
 
-canvas.addEventListener('mousedown', (e) => {
+elements.canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
 
     [lastX, lastY] = getCanvasCoordinate(e);
     console.debug(lastX, lastY);
 });
-canvas.addEventListener('mouseup', () => {
+elements.canvas.addEventListener('mouseup', () => {
     isDragging = false;
 });
-canvas.addEventListener('mouseleave', () => {
+elements.canvas.addEventListener('mouseleave', () => {
     isDragging = false;
 });
 
 const throttleMoveView = throttle(async (e) => {
-    const rect = canvas.getBoundingClientRect();
+    const rect = elements.canvas.getBoundingClientRect();
     const [canvasX, canvasY] = getCanvasCoordinate(e);
     const [dx, dy] = [canvasX - lastX, canvasY - lastY];
     [lastX, lastY] = [canvasX, canvasY];
@@ -266,7 +268,7 @@ const throttleMoveView = throttle(async (e) => {
     await setSpinner(updateTile);
 }, 30);
 
-canvas.addEventListener('mousemove', async (e) => {
+elements.canvas.addEventListener('mousemove', async (e) => {
     if (!isDragging)
         return;
     throttleMoveView(e);
@@ -279,7 +281,7 @@ const throttleZoomView = throttle(async (e) => {
     const level = (wheelAccum > 0) ? -1 : 1;
     wheelAccum = 0;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = elements.canvas.getBoundingClientRect();
     const [canvasX, canvasY] = getCanvasCoordinate(e);
 
     await invoke("zoom_view", { level, x: canvasX / rect.width, y: canvasY / rect.height });
@@ -288,7 +290,7 @@ const throttleZoomView = throttle(async (e) => {
     await setSpinner(updateTile);
 }, 30);
 
-canvas.addEventListener('wheel', async (e) => {
+elements.canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
     wheelAccum += e.deltaY;
     throttleZoomView(e);
