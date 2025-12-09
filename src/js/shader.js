@@ -130,6 +130,15 @@ export function updateMaxIter(maxIter) {
 }
 
 /**
+ * ビューポートサイズを更新する
+ * @param {number} size 新しいcanvasサイズ
+ */
+export function updateViewport(size) {
+    if (!gl) return;
+    gl.viewport(0, 0, size, size);
+}
+
+/**
  * GPUテクスチャに部分更新をかける
  * @returns {void}
  */

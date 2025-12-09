@@ -2,6 +2,7 @@
 
 import {
     updateMaxIter,
+    updateViewport,
     updateTile,
     createTextureFromData,
 } from "./shader.js";
@@ -206,6 +207,7 @@ async function setSize() {
     const value = Number(size.value);
     canvas.width = value;
     canvas.height = value;
+    updateViewport(value);
     createTextureFromData(null, value);
     await invoke("set_size", { size: value });
 }
