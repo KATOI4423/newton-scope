@@ -24,11 +24,12 @@ const elements = {
     spinner:    document.getElementById('spinner'),
 };
 
-
-let prevFormula = "";
-let prevMaxIter;
-
-let wheelAccum = 0;
+/* State Management */
+const state = {
+    prevFormula:    "",
+    prevMaxIter:    0,
+    wheelAccum:     0,
+};
 
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
@@ -98,15 +99,15 @@ async function setDefault(isUserClidked) {
 
     await invoke("initialize");
     elements.fexpr.value = await invoke("get_default_formula");
-    prevFormula = elements.fexpr.value;
+    state.prevFormula = elements.fexpr.value;
     elements.presetSize.value = await invoke("get_default_size");
     const maxIterValue = await invoke("get_default_max_iter");
     syncMaxIterInputs(maxIterValue);
     updateMaxIter(maxIterValue);
-    prevMaxIter = maxIterValue;
+    state.prevMaxIter = maxIterValue;
     await setCenterStr();
     await setScaleStr();
-    wheelAccum = 0;
+    state.wheelAccum = 0;
 
     await setSize();
     await setSpinner(updateTile);
@@ -136,13 +137,13 @@ async function setFexpr() {
         const f = elements.fexpr.value;
         const ret = await invoke("set_formula", { formula: f });
         if (ret !== "OK") {
-            elements.fexpr.value = prevFormula;
+            elements.fexpr.value = state.prevFormula;
             await message(ret, { title: "Failed to set f(z)", kind: "error" });
             throw Error("Failed to set formula", f, ret);
         }
 
         await updateTile();
-        prevFormula = f;
+        state.prevFormula = f;
     });
 }
 
@@ -164,7 +165,7 @@ elements.maxIter.addEventListener('change', async () => {
             `Out of range: ${elements.maxIter.min} ~ ${elements.maxIter.max}`,
             { title: "Failed to set Max iterations", kind: "error" }
         );
-        syncMaxIterInputs(prevMaxIter);
+        syncMaxIterInputs(state.prevMaxIter);
         return;
     }
 
@@ -183,14 +184,14 @@ async function innerSetMaxIter(value) {
         await invoke("set_max_iter", { maxIter: value });
         updateMaxIter(value);
         await setSpinner(updateTile);
-        prevMaxIter = value;
+        state.prevMaxIter = value;
     } catch (error) {
         await message(
             error,
             { title: "Failed to set Max iterations", kind: "error" }
         );
-        elements.maxIter.value = prevMaxIter;
-        elements.iterRange.value = prevMaxIter;
+        elements.maxIter.value = state.prevMaxIter;
+        elements.iterRange.value = state.prevMaxIter;
         updateIterRangeBackground();
     }
 }
@@ -275,11 +276,11 @@ elements.canvas.addEventListener('mousemove', async (e) => {
 });
 
 const throttleZoomView = throttle(async (e) => {
-    if (wheelAccum === 0)
+    if (state.wheelAccum === 0)
         return;
 
-    const level = (wheelAccum > 0) ? -1 : 1;
-    wheelAccum = 0;
+    const level = (state.wheelAccum > 0) ? -1 : 1;
+    state.wheelAccum = 0;
 
     const rect = elements.canvas.getBoundingClientRect();
     const [canvasX, canvasY] = getCanvasCoordinate(e);
@@ -292,6 +293,6 @@ const throttleZoomView = throttle(async (e) => {
 
 elements.canvas.addEventListener('wheel', async (e) => {
     e.preventDefault();
-    wheelAccum += e.deltaY;
+    state.wheelAccum += e.deltaY;
     throttleZoomView(e);
 });
