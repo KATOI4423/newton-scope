@@ -1,6 +1,7 @@
 // ui.js
 
 import {
+    initGLSetup,
     resizeTexture,
     updateMaxIter,
     updateViewport,
@@ -29,52 +30,33 @@ const state = {
     prevFormula:    "",
     prevMaxIter:    0,
     wheelAccum:     0,
+    isDragging:     false,
+    // 入力蓄積用バッファ
+    pendingMove:    { dx: 0, dy: 0 },
+    pendingZoom:    { level: 0, x: 0, y: 0 },
+    // 描画領域のキャッシュ
+    rect:           { width: 1, height: 1, left: 0, top: 0 },
+    // IPC制御フラグ
+    isRendering:    false,
 };
 
 const invoke = window.__TAURI__.core.invoke;
 const { confirm, message } = window.__TAURI__.dialog;
 
 
-/**
- * 連続して呼ばれる処理を、一定間隔に1回実行する
- * @param {Function} func 実行する処理
- * @param {Number} interval 実行間隔[msec]
- */
-function throttle(func, interval = 100) {
-    let lastExecTime = 0;
-    let lastArgs = null;
-    let timerId = null;
-
-    return (...args) => {
-        const now = Date.now();
-        lastArgs = args;
-
-        if (now - lastExecTime >= interval) {
-            func(...args);
-            lastExecTime = now;
-        } else {
-            clearTimeout(timerId);
-            timerId = setTimeout(() => {
-                func(...lastArgs);
-                lastExecTime = Date.now();
-            }, interval);
-        }
-    };
-}
+// ----- Utilities -----------------------------
 
 /**
  * 一定時間経過しても処理が完了しない場合、スピナーを表示する
  * @param {Function} func 実行する処理
  * @param {Number} delayMsec スピナーを表示するまでの時間[msec]
  */
-async function setSpinner(func, delayMsec = 500) {
+async function withSpinner(func, delayMsec = 500) {
     let showSpinner = true;
     const timer = setTimeout(() => {
-        if (!showSpinner)
-            return;
-
-        elements.spinner.style.display = "flex";
-        console.info("The operation is taking longer than expected...");
+        if (showSpinner) {
+            elements.spinner.style.display = "flex";
+        }
     }, delayMsec);
 
     try {
@@ -88,52 +70,187 @@ async function setSpinner(func, delayMsec = 500) {
     }
 }
 
-// default setting
+
+// ----- Initialization & Config ---------------
+
+/**
+ * 設定値を初期化する
+ * Resetボタンによる初期化の場合は、確認ダイアログを表示する
+ * @param {Boolean} isUserClidked Resetボタンによる初期化かどうか
+ */
 async function setDefault(isUserClidked) {
     if (isUserClidked) {
-        const ok = await confirm('Are you sure to reset all configures?',
-            { title: '', type: 'warning' }
-        );
-        if (!ok) return;
+        if(!await confirm('Are you sure to reset all configures?', { title: '', type: 'warning' }))
+        {
+            return;
+        }
     }
 
     await invoke("initialize");
-    elements.fexpr.value = await invoke("get_default_formula");
-    state.prevFormula = elements.fexpr.value;
-    elements.presetSize.value = await invoke("get_default_size");
-    const maxIterValue = await invoke("get_default_max_iter");
-    syncMaxIterInputs(maxIterValue);
-    updateMaxIter(maxIterValue);
-    state.prevMaxIter = maxIterValue;
-    await setCenterStr();
-    await setScaleStr();
-    state.wheelAccum = 0;
 
-    await setSize();
-    await setSpinner(updateTile);
+    const [defaultFormula, defaultSize, defaultMaxIter] = await Promise.all([
+        invoke("get_default_formula"),
+        invoke("get_default_size"),
+        invoke("get_default_max_iter")
+    ]);
+
+    elements.fexpr.value = defaultFormula;
+    state.prevFormula = defaultFormula;
+
+    elements.presetSize.value = defaultSize;
+
+    syncMaxIterInputs(defaultMaxIter);
+    updateMaxIter(defaultMaxIter);
+    state.prevMaxIter = defaultMaxIter;
+
+    await Promise.all([updateInfoStr(), setSize()]);
+    await withSpinner(updateTile);
 }
 
+/** GLSLと設定値を初期化 */
 async function initialize() {
+    await initGLSetup();
     await setDefault(false);
 }
 
-async function clickedReset() {
-    await setDefault(true);
+
+// ----- Update Logic --------------------------
+
+/** CenterとScaleの情報を更新する */
+async function updateInfoStr() {
+    const [center, scale] = await Promise.all([
+        invoke("get_center_str"),
+        invoke("get_scale_str")
+    ]);
+    elements.center.textContent = center;
+    elements.scale.textContent = scale;
 }
 
-elements.resetBtn.addEventListener('click', clickedReset);
-window.addEventListener("DOMContentLoaded", initialize);
 
-export async function setCenterStr() {
-    elements.center.textContent = await invoke("get_center_str");
-}
+// ----- Interaction Handlers ------------------
 
-export async function setScaleStr() {
-    elements.scale.textContent = await invoke("get_scale_str");
+/** ResizeObserver: サイズ変更を検知し、rectをキャッシュする */
+const resizeObserver = new ResizeObserver(() => {
+    const wrapRect = elements.wrap.getBoundingClientRect();
+    const coordsRect = elements.coords.getBoundingClientRect();
+
+    const availableHeight = wrapRect.height - coordsRect.height;
+    const availableWidth = wrapRect.width;
+    const sizeVal = Math.min(availableWidth, availableHeight);
+
+    elements.canvas.style.width = `${sizeVal}px`;
+    elements.canvas.style.height = `${sizeVal}px`;
+
+    // canvasのgetBoundingClientRectを呼ぶ回数を減らすため、値をグローバル変数にキャッシュする
+    const r = elements.canvas.getBoundingClientRect();
+    state.rect = {
+        width: r.width,
+        height: r.height,
+        left: r.left,
+        top: r.top,
+    };
+});
+resizeObserver.observe(elements.wrap);
+
+/**
+ * Input Loop: requestAnimationFrameを使用して、GPUの準備ができている時だけ処理を行う
+ * かつ、Rust側がBusyの場合は入力を蓄積する
+ */
+async function interactionLoop() {
+    if (state.isRendering) {
+        requestAnimationFrame(interactionLoop);
+        return;
+    }
+
+    let needsUpdate = false;
+
+    if (state.pendingZoom.level !== 0) {
+        state.isRendering = true;
+        const { level, x, y } = state.pendingZoom;
+
+        // バッファをリセット
+        state.pendingZoom = { level: 0, x: 0, y: 0 };
+
+        try {
+            await invoke("zoom_view", { level, x, y });
+            await updateInfoStr();
+            await updateTile();
+        } finally {
+            state.isRendering = false;
+            // 処理中に入力があれば、次のループにて処理する
+            requestAnimationFrame(interactionLoop);
+        }
+        return;
+    }
+
+    if ((state.pendingMove.dx !== 0) || (state.pendingMove.dy !== 0)) {
+        state.isRendering = true;
+        const { dx, dy } = state.pendingMove;
+
+        // バッファをリセット
+        state.pendingMove = { dx: 0, dy: 0 };
+
+        try {
+            await invoke("move_view", {
+                dx: dx / state.rect.width,
+                dy: dy / state.rect.height
+            });
+            await updateInfoStr();
+            await updateTile();
+        } finally {
+            state.isRendering = false;
+            // 処理中に入力があれば、次のループにて処理する
+            requestAnimationFrame(interactionLoop);
+        }
+        return;
+    }
+
+    requestAnimationFrame(interactionLoop);
 }
+// ループ開始
+requestAnimationFrame(interactionLoop);
+
+
+// ----- Event Listeners -----------------------
+
+elements.canvas.addEventListener('pointerdown', (e) => {
+    elements.canvas.setPointerCapture(e.pointerId);
+    state.isDragging = true;
+});
+elements.canvas.addEventListener('pointerup', (e) => {
+    elements.canvas.releasePointerCapture(e.pointerId);
+    state.isDragging = false;
+});
+elements.canvas.addEventListener('pointermove', (e) => {
+    if (!state.isDragging) {
+        return;
+    }
+
+    state.pendingMove.dx += e.movementX;
+    state.pendingMove.dy += e.movementY;
+})
+
+elements.canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    // e.clientX/Y はViewport基準なので、rect.left/topを引けばCanvas内座標になる
+    const canvasX = e.clientX - state.rect.left;
+    const canvasY = e.clientY - state.rect.top;
+
+    const normX = canvasX / state.rect.width;
+    const normY = canvasY / state.rect.height;
+
+    const level = (e.deltaY > 0) ? -1 : 1;
+
+    // 蓄積ではなく、最新のターゲットを更新する
+    state.pendingZoom = { level, x: normX, y: normY };
+}, { passive: false });
+
+
+// ----- UI Component Handlers -----------------
 
 async function setFexpr() {
-    await setSpinner(async () => {
+    await withSpinner(async () => {
         const f = elements.fexpr.value;
         const ret = await invoke("set_formula", { formula: f });
         if (ret !== "OK") {
@@ -146,153 +263,72 @@ async function setFexpr() {
         state.prevFormula = f;
     });
 }
-
 elements.fexpr.addEventListener('change', setFexpr);
-
-const throttleSetMaxIter = throttle(async (value) => {
-    await innerSetMaxIter(value);
-}, 100);
-
-elements.iterRange.addEventListener('input', async () => {
-    let value = elements.iterRange.valueAsNumber;
-    syncMaxIterInputs(value);
-    throttleSetMaxIter(value);
-});
-elements.maxIter.addEventListener('change', async () => {
-    let value = elements.maxIter.valueAsNumber;
-    if (!elements.maxIter.validity.valid) {
-        await message(
-            `Out of range: ${elements.maxIter.min} ~ ${elements.maxIter.max}`,
-            { title: "Failed to set Max iterations", kind: "error" }
-        );
-        syncMaxIterInputs(state.prevMaxIter);
-        return;
-    }
-
-    syncMaxIterInputs(value);
-    await innerSetMaxIter(value);
-});
 
 function syncMaxIterInputs(value) {
     elements.maxIter.value = value;
     elements.iterRange.value = value;
-    updateIterRangeBackground();
-}
 
-async function innerSetMaxIter(value) {
-    try {
-        await invoke("set_max_iter", { maxIter: value });
-        updateMaxIter(value);
-        await setSpinner(updateTile);
-        state.prevMaxIter = value;
-    } catch (error) {
-        await message(
-            error,
-            { title: "Failed to set Max iterations", kind: "error" }
-        );
-        elements.maxIter.value = state.prevMaxIter;
-        elements.iterRange.value = state.prevMaxIter;
-        updateIterRangeBackground();
-    }
-}
-
-function updateIterRangeBackground() {
     const baseColor = '#ccc';
     const activeColor = '#ff4500';
 
     const progress = (elements.iterRange.value / elements.iterRange.max) * 100;
     elements.iterRange.style.background = `linear-gradient(to right, ${activeColor} ${progress}%, ${baseColor} ${progress}%)`;
 }
-elements.iterRange.addEventListener('input', updateIterRangeBackground);
-elements.maxIter.addEventListener('change', updateIterRangeBackground);
+
+
+// iterRangeはinputイベントが大量に来るので、Debounce処理を行う
+let iterTimer;
+elements.iterRange.addEventListener('input', () => {
+    const value = elements.iterRange.valueAsNumber;
+    syncMaxIterInputs(value);
+
+    clearTimeout(iterTimer);
+    iterTimer = setTimeout(async () => {
+        await innerSetMaxIter(value);
+    }, 100);
+});
+
+elements.maxIter.addEventListener('change', async () => {
+    const value = elements.maxIter.valueAsNumber;
+    if (!elements.maxIter.validity.valid) {
+        await message("Out of range", { title: "Error", kind: "error" });
+        syncMaxIterInputs(state.prevMaxIter);
+        return;
+    }
+    syncMaxIterInputs(value);
+    await innerSetMaxIter(value);
+})
+
+async function innerSetMaxIter(value) {
+    try {
+        await invoke("set_max_iter", { maxIter: value });
+        updateMaxIter(value);
+        await withSpinner(updateTile);
+        state.prevMaxIter = value;
+    } catch (error) {
+        await message(error, { title: "Error", kind: "error" });
+        syncMaxIterInputs(state.prevMaxIter);
+    }
+}
 
 async function setSize() {
     const value = Number(elements.presetSize.value);
     elements.canvas.width = value;
     elements.canvas.height = value;
+
     updateViewport(value);
     resizeTexture(value);
+
     await invoke("set_size", { size: value });
 }
-
-elements.presetSize.addEventListener("change", async () => {
+elements.presetSize.addEventListener('change', async () => {
     await setSize();
-    await setSpinner(updateTile);
+    await withSpinner(updateTile);
 });
 
-// fractalの描写要素を正方形に保つ
-function adjustCanvasSize() {
-    const wrapRect = elements.wrap.getBoundingClientRect();
-    const coordsRect = elements.coords.getBoundingClientRect();
-
-    const availableHeight = wrapRect.height - coordsRect.height;
-    const availableWidth = wrapRect.width;
-
-    const size = Math.min(availableWidth, availableHeight);
-    elements.canvas.style.width = `${size}px`;
-    elements.canvas.style.height = `${size}px`;
-}
-
-window.addEventListener("load", adjustCanvasSize);
-window.addEventListener("resize", adjustCanvasSize);
-
-let isDragging = false;
-let lastX = 0;
-let lastY = 0;
-
-function getCanvasCoordinate(mouseEvent) {
-    const rect = elements.canvas.getBoundingClientRect();
-    return [mouseEvent.clientX - rect.left, mouseEvent.clientY - rect.top];
-}
-
-elements.canvas.addEventListener('mousedown', (e) => {
-    isDragging = true;
-
-    [lastX, lastY] = getCanvasCoordinate(e);
-    console.debug(lastX, lastY);
-});
-elements.canvas.addEventListener('mouseup', () => {
-    isDragging = false;
-});
-elements.canvas.addEventListener('mouseleave', () => {
-    isDragging = false;
+elements.resetBtn.addEventListener('click', () => {
+    setDefault(true);
 });
 
-const throttleMoveView = throttle(async (e) => {
-    const rect = elements.canvas.getBoundingClientRect();
-    const [canvasX, canvasY] = getCanvasCoordinate(e);
-    const [dx, dy] = [canvasX - lastX, canvasY - lastY];
-    [lastX, lastY] = [canvasX, canvasY];
-
-    await invoke("move_view", { dx: dx / rect.width, dy: dy / rect.height });
-    await setCenterStr();
-    await setSpinner(updateTile);
-}, 30);
-
-elements.canvas.addEventListener('mousemove', async (e) => {
-    if (!isDragging)
-        return;
-    throttleMoveView(e);
-});
-
-const throttleZoomView = throttle(async (e) => {
-    if (state.wheelAccum === 0)
-        return;
-
-    const level = (state.wheelAccum > 0) ? -1 : 1;
-    state.wheelAccum = 0;
-
-    const rect = elements.canvas.getBoundingClientRect();
-    const [canvasX, canvasY] = getCanvasCoordinate(e);
-
-    await invoke("zoom_view", { level, x: canvasX / rect.width, y: canvasY / rect.height });
-    await setScaleStr();
-    await setCenterStr();
-    await setSpinner(updateTile);
-}, 30);
-
-elements.canvas.addEventListener('wheel', async (e) => {
-    e.preventDefault();
-    state.wheelAccum += e.deltaY;
-    throttleZoomView(e);
-});
+window.addEventListener("DOMContentLoaded", initialize);

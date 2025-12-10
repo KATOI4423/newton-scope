@@ -209,7 +209,7 @@ function renderFrame() {
  * 初期化エントリポイント
  * @returns {Promise<void>}
  */
-async function main() {
+export async function initGLSetup() {
     const texSize = await invoke("get_default_size");
     const maxIter = await invoke("get_default_max_iter");
 
@@ -223,5 +223,3 @@ async function main() {
     await updateTile();
     renderFrame();
 }
-
-window.addEventListener("DOMContentLoaded", main);
