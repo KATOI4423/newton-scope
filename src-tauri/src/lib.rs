@@ -18,7 +18,7 @@ pub fn run() {
       calculate::get_size,
       calculate::move_view,
       calculate::zoom_view,
-      calculate::generate_test_data,
+      calculate::render_tile,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

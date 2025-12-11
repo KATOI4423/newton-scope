@@ -188,7 +188,12 @@ export function updateViewport(size) {
  */
 export async function updateTile() {
     const size = await invoke("get_size");
-    const data = await invoke("generate_test_data");
+    const data = await invoke("render_tile", {
+        x: 0,
+        y: 0,
+        w: size,
+        h: size
+    });
     const array = new Uint16Array(data);
 
     updateTexture(array, size, size, 0, 0);

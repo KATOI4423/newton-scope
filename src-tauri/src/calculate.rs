@@ -342,40 +342,56 @@ pub fn zoom_view(level: i32, x: f64, y: f64) {
     fractal.canvas_mut().zoom_around_point(level, x, y);
 }
 
+/// テスト用の計算ロジック
+fn result(f: &Func, df: &Func, z: Complex<f64>, max_iter: &u16) -> u16 {
+    let val_f = f(&[z]).norm();
+    let val_df = df(&[z]).norm();
+
+    ((val_f + val_df) * 10.0 % (*max_iter as f64)) as u16
+}
+
+/// # 指定された矩形領域のデータのみを生成して返す
+///
+/// ## Params
+///  - x: 矩形領域の左上のX座標（canvas全体に対するオフセット）
+///  - y: 矩形領域の左上のY座標（canvas全体に対するオフセット）
+///  - w: 矩形領域の幅
+///  - h: 矩形領域の高さ
 #[tauri::command]
-pub fn generate_test_data() -> Vec<u16> {
-    let (
-        center,
-        width,
-        max_iter,
-        size,
-        f,
-        df,
-    ) = {
+pub fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Vec<u16> {
+    let (max_iter, total_size, f, df, center, width) = {
         let fractal = FRACTAL.lock().unwrap();
         (
-            fractal.canvas().center(),
-            fractal.canvas().width(),
             fractal.max_iter(),
-            fractal.canvas().size(),
+            fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
             fractal.formulac().func().clone(),
             fractal.formulac().deriv().clone(),
+            fractal.canvas().center(),
+            fractal.canvas().width(),
         )
     };
-    let mut data = vec![0u16; size as usize * size as usize];
 
-    for y in 0..size {
-        let y_val = (y as f64 / size as f64 - 0.5) * width + center.im;
-        let a_y = f(&[y_val.into()]).norm();
-        let i_y = y as usize * size as usize;
-        for x in 0..size {
-            let x_val = (x as f64 / size as f64 - 0.5) * width + center.re;
-            let a_x = df(&[x_val.into()]).norm();
-            let val = ((a_x * a_y) % max_iter as f64) as u16;
-            let idx = i_y + x as usize;
-            data[idx] = val;
-        }
-    }
+    let len = (w as usize) * (h as usize);
+    let mut buffer = vec![0u16; len];
 
-    data
+    buffer.par_chunks_mut(w as usize) // 行ごとに分割
+        .enumerate()
+        .for_each(|(row_idx, row_slice)| {
+            // 座標変換: [0, 1] -> [-0.5, 0.5] -> 複素平面上の座標
+            let py = y + (row_idx as u32);
+            let ratio_y = (py as f64) / total_size;
+            let im = (ratio_y - 0.5) * width + center.im;
+
+            for (col_idx, pixel_val) in row_slice.iter_mut().enumerate() {
+                let px = x + (col_idx as u32);
+                let ratio_x = (px as f64) / total_size;
+                let re = (ratio_x - 0.5) * width + center.re;
+
+                let z = Complex::new(re, im);
+
+                *pixel_val = result(&f, &df, z, &max_iter);
+            }
+        });
+
+    buffer
 }
