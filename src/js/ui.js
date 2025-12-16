@@ -185,18 +185,19 @@ async function interactionLoop() {
 
     if ((state.pendingMove.dx !== 0) || (state.pendingMove.dy !== 0)) {
         state.isRendering = true;
-        const { dx, dy } = state.pendingMove;
+        const normalizedDx = state.pendingMove.dx / state.rect.width;
+        const normalizedDy = state.pendingMove.dy / state.rect.height;
 
         // バッファをリセット
         state.pendingMove = { dx: 0, dy: 0 };
 
         try {
             await invoke("move_view", {
-                dx: dx / state.rect.width,
-                dy: dy / state.rect.height
+                dx: normalizedDx,
+                dy: normalizedDy
             });
             await updateInfoStr();
-            await updateTile();
+            await updateTile(normalizedDx, normalizedDy);
         } finally {
             state.isRendering = false;
             // 処理中に入力があれば、次のループにて処理する
