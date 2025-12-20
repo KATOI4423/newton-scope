@@ -152,6 +152,68 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(elements.wrap);
 
+/** zoom処理 */
+async function zoomProcess() {
+    const { level, x, y } = state.pendingZoom;
+
+    // バッファをリセット
+    state.pendingZoom = { level: 0, x: 0, y: 0 };
+
+    try {
+        const size = Number(elements.presetSize.value);
+        await invoke("zoom_view", { level, x, y });
+        await updateInfoStr();
+        await updateTile(size, size);
+    } finally {
+        state.isRendering = false;
+        // 処理中に入力があれば、次のループにて処理する
+        requestAnimationFrame(interactionLoop);
+    }
+}
+
+/** move処理 */
+async function moveProcess() {
+    const texSize = Number(elements.presetSize.value);
+
+    // ゼロ除算防止
+    const rectW = state.rect.width || 1;
+    const rectH = state.rect.height || 1;
+
+    const ratioX = texSize / rectW;
+    const ratioY = texSize / rectH;
+
+    // マウス移動量（screen）をテクスチャ移動量（Texture）に変換する
+    // pendingMoveは非整数の可能性があるため、roundで整数に変換して、移動量とする
+    const pixelDx = Math.round(state.pendingMove.dx * ratioX);
+    const pixelDy = Math.round(state.pendingMove.dy * ratioY);
+
+    // 移動した分を元に戻す（少数点が残る場合は蓄積する）
+    state.pendingMove.dx -= pixelDx / ratioX;
+    state.pendingMove.dy -= pixelDy / ratioY;
+
+    if (pixelDx === 0 && pixelDy  === 0) {
+        state.isRendering = false;
+        requestAnimationFrame(interactionLoop);
+        return;
+    }
+
+    try {
+        const normalizedDx = pixelDx / texSize;
+        const normalizedDy = pixelDy / texSize;
+
+        await invoke("move_view", {
+            dx: normalizedDx,
+            dy: normalizedDy
+        });
+        await updateInfoStr();
+        await updateTile(pixelDx, pixelDy);
+    } finally {
+        state.isRendering = false;
+        // 処理中に入力があれば、次のループにて処理する
+        requestAnimationFrame(interactionLoop);
+    }
+}
+
 /**
  * Input Loop: requestAnimationFrameを使用して、GPUの準備ができている時だけ処理を行う
  * かつ、Rust側がBusyの場合は入力を蓄積する
@@ -162,68 +224,15 @@ async function interactionLoop() {
         return;
     }
 
-    let needsUpdate = false;
-
     if (state.pendingZoom.level !== 0) {
         state.isRendering = true;
-        const { level, x, y } = state.pendingZoom;
-
-        // バッファをリセット
-        state.pendingZoom = { level: 0, x: 0, y: 0 };
-
-        try {
-            await invoke("zoom_view", { level, x, y });
-            await updateInfoStr();
-            await updateTile();
-        } finally {
-            state.isRendering = false;
-            // 処理中に入力があれば、次のループにて処理する
-            requestAnimationFrame(interactionLoop);
-        }
+        await zoomProcess();
         return;
     }
 
     if ((state.pendingMove.dx !== 0) || (state.pendingMove.dy !== 0)) {
         state.isRendering = true;
-        const texSize = Number(elements.presetSize.value);
-
-        // ゼロ除算防止
-        const rectW = state.rect.width || 1;
-        const rectH = state.rect.height || 1;
-
-        const ratioX = texSize / rectW;
-        const ratioY = texSize / rectH;
-
-        // マウス移動量（screen）をテクスチャ移動量（Texture）に変換する
-        // pendingMoveは非整数の可能性があるため、roundで整数に変換して、移動量とする
-        const pixelDx = Math.round(state.pendingMove.dx * ratioX);
-        const pixelDy = Math.round(state.pendingMove.dy * ratioY);
-
-        // 移動した分を元に戻す（少数点が残る場合は蓄積する）
-        state.pendingMove.dx -= pixelDx / ratioX;
-        state.pendingMove.dy -= pixelDy / ratioY;
-
-        if (pixelDx === 0 && pixelDy  === 0) {
-            state.isRendering = false;
-            requestAnimationFrame(interactionLoop);
-            return;
-        }
-
-        try {
-            const normalizedDx = pixelDx / texSize;
-            const normalizedDy = pixelDy / texSize;
-
-            await invoke("move_view", {
-                dx: normalizedDx,
-                dy: normalizedDy
-            });
-            await updateInfoStr();
-            await updateTile(pixelDx, pixelDy);
-        } finally {
-            state.isRendering = false;
-            // 処理中に入力があれば、次のループにて処理する
-            requestAnimationFrame(interactionLoop);
-        }
+        await moveProcess();
         return;
     }
 
