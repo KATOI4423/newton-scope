@@ -104,7 +104,7 @@ async function setDefault(isUserClidked) {
     state.prevMaxIter = defaultMaxIter;
 
     await Promise.all([updateInfoStr(), setSize()]);
-    await withSpinner(updateTile);
+    await withSpinner(async () => updateTile(defaultSize, defaultSize));
 }
 
 /** GLSLと設定値を初期化 */
@@ -185,19 +185,40 @@ async function interactionLoop() {
 
     if ((state.pendingMove.dx !== 0) || (state.pendingMove.dy !== 0)) {
         state.isRendering = true;
-        const normalizedDx = state.pendingMove.dx / state.rect.width;
-        const normalizedDy = state.pendingMove.dy / state.rect.height;
+        const texSize = Number(elements.presetSize.value);
 
-        // バッファをリセット
-        state.pendingMove = { dx: 0, dy: 0 };
+        // ゼロ除算防止
+        const rectW = state.rect.width || 1;
+        const rectH = state.rect.height || 1;
+
+        const ratioX = texSize / rectW;
+        const ratioY = texSize / rectH;
+
+        // マウス移動量（screen）をテクスチャ移動量（Texture）に変換する
+        // pendingMoveは非整数の可能性があるため、roundで整数に変換して、移動量とする
+        const pixelDx = Math.round(state.pendingMove.dx * ratioX);
+        const pixelDy = Math.round(state.pendingMove.dy * ratioY);
+
+        // 移動した分を元に戻す（少数点が残る場合は蓄積する）
+        state.pendingMove.dx -= pixelDx / ratioX;
+        state.pendingMove.dy -= pixelDy / ratioY;
+
+        if (pixelDx === 0 && pixelDy  === 0) {
+            state.isRendering = false;
+            requestAnimationFrame(interactionLoop);
+            return;
+        }
 
         try {
+            const normalizedDx = pixelDx / texSize;
+            const normalizedDy = pixelDy / texSize;
+
             await invoke("move_view", {
                 dx: normalizedDx,
                 dy: normalizedDy
             });
             await updateInfoStr();
-            await updateTile(normalizedDx, normalizedDy);
+            await updateTile(pixelDx, pixelDy);
         } finally {
             state.isRendering = false;
             // 処理中に入力があれば、次のループにて処理する
@@ -260,7 +281,8 @@ async function setFexpr() {
             throw Error("Failed to set formula", f, ret);
         }
 
-        await updateTile();
+        const size = Number(elements.presetSize.value);
+        await updateTile(size, size);
         state.prevFormula = f;
     });
 }
@@ -305,7 +327,8 @@ async function innerSetMaxIter(value) {
     try {
         await invoke("set_max_iter", { maxIter: value });
         updateMaxIter(value);
-        await withSpinner(updateTile);
+        const size = Number(elements.presetSize.value);
+        await withSpinner(async () => updateTile(size, size));
         state.prevMaxIter = value;
     } catch (error) {
         await message(error, { title: "Error", kind: "error" });
@@ -324,8 +347,9 @@ async function setSize() {
     await invoke("set_size", { size: value });
 }
 elements.presetSize.addEventListener('change', async () => {
+    const size = Number(elements.presetSize.value);
     await setSize();
-    await withSpinner(updateTile);
+    await withSpinner(async () => updateTile(size, size));
 });
 
 elements.resetBtn.addEventListener('click', () => {

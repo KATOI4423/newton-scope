@@ -317,19 +317,24 @@ function switchTexture() {
 
 /**
  * GPUテクスチャに部分更新をかける
- * @param {number} [dx=1.0] 正規化座標におけるX軸の移動量 [-1.0, 1.0]
- * @param {number} [dy=1.0] 正規化座標におけるY軸の移動量 [-1.0, 1.0]
+ * @param {number} pixelDx X軸方向の移動量
+ * @param {number} pixelDy Y軸方向の移動量
  * @returns {void}
  */
-export async function updateTile(dx = 1.0, dy = 1.0) {
+export async function updateTile(pixelDx, pixelDy) {
     if (!gl) return;
     const totalSize = await invoke("get_size");
 
-    // 移動によって生じた領域のデータのみを計算する
-    const pixelDx = Math.round(dx * totalSize);
-    const pixelDy = Math.round(dy * totalSize);
-
     if ((pixelDx === 0) && (pixelDy === 0)) {
+        renderFrame();
+        return;
+    }
+
+    // 移動量が画面サイズ以上の場合はBlitできないので、全画面書き換えとする
+    if (Math.abs(pixelDx) >= totalSize || Math.abs(pixelDy) >= totalSize) {
+        const data = await invoke("render_tile", { x: 0, y: 0, w: totalSize, h: totalSize });
+        const array = new Uint16Array(data);
+        updateTexture(array, totalSize, totalSize, 0, 0);
         renderFrame();
         return;
     }
@@ -403,6 +408,6 @@ export async function initGLSetup() {
     resizeTexture(texSize);
     updateMaxIter(maxIter);
 
-    await updateTile(0.0, 0.0);
+    await updateTile(0, 0);
     startRenderLoop();
 }
