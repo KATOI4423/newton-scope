@@ -347,11 +347,6 @@ export async function updateTile(pixelDx, pixelDy) {
 
     shiftOffset.x = 0.0; shiftOffset.y = 0.0;
 
-    // Blitによりデータ自体が移動済みなので、ここですぐに renderFrame すると
-    // 空白部分は「前のフレームの残りカス」が表示されるが、一瞬なので許容する
-    // 気になる場合は、ここで renderFrame を呼ばない
-    renderFrame();
-
     const requests = calc_request_rects(pixelDx, pixelDy, totalSize);
     if (requests.length === 0) {
         renderFrame();
