@@ -5,11 +5,12 @@ use num_traits::{
     FromPrimitive,
 };
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
 use std::sync::{
     Arc,
     Mutex,
 };
+
+use crate::btm;
 
 /// 初期値
 mod default {
@@ -37,7 +38,7 @@ where
 }
 
 /// Formulacが生成する匿名関数を保持する
-type Func = Arc<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
+pub type Func = Arc<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
 
 /// formulacの変数を保持する構造体
 struct Formulac
@@ -342,14 +343,6 @@ pub fn zoom_view(level: i32, x: f64, y: f64) {
     fractal.canvas_mut().zoom_around_point(level, x, y);
 }
 
-/// テスト用の計算ロジック
-fn result(f: &Func, df: &Func, z: Complex<f64>, max_iter: &u16) -> u16 {
-    let val_f = f(&[z]).norm();
-    let val_df = df(&[z]).norm();
-
-    ((val_f + val_df) * 10.0 % (*max_iter as f64)) as u16
-}
-
 /// # 指定された矩形領域のデータのみを生成して返す
 ///
 /// ## Params
@@ -359,39 +352,19 @@ fn result(f: &Func, df: &Func, z: Complex<f64>, max_iter: &u16) -> u16 {
 ///  - h: 矩形領域の高さ
 #[tauri::command]
 pub fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Vec<u16> {
-    let (max_iter, total_size, f, df, center, width) = {
+    let info = {
         let fractal = FRACTAL.lock().unwrap();
-        (
+        btm::CalcInfo::new(
+            x, y, w, h,
             fractal.max_iter(),
             fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
-            fractal.formulac().func().clone(),
-            fractal.formulac().deriv().clone(),
             fractal.canvas().center(),
             fractal.canvas().width(),
+            fractal.formulac().func().clone(),
+            fractal.formulac().deriv().clone(),
+            Complex::ONE, // TODO: UIから変更できるようにする？
         )
     };
 
-    let len = (w as usize) * (h as usize);
-    let mut buffer = vec![0u16; len];
-
-    buffer.par_chunks_mut(w as usize) // 行ごとに分割
-        .enumerate()
-        .for_each(|(row_idx, row_slice)| {
-            // 座標変換: [0, 1] -> [-0.5, 0.5] -> 複素平面上の座標
-            let py = y + (row_idx as u32);
-            let ratio_y = (py as f64) / total_size;
-            let im = (ratio_y - 0.5) * width + center.im;
-
-            for (col_idx, pixel_val) in row_slice.iter_mut().enumerate() {
-                let px = x + (col_idx as u32);
-                let ratio_x = (px as f64) / total_size;
-                let re = (ratio_x - 0.5) * width + center.re;
-
-                let z = Complex::new(re, im);
-
-                *pixel_val = result(&f, &df, z, &max_iter);
-            }
-        });
-
-    buffer
+    btm::calc_rect(info)
 }
