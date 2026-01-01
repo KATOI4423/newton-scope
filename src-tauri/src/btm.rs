@@ -243,7 +243,46 @@ fn fill_in_the_rest(buffer: &mut [u16], width: u32, height: u32)
     }
 }
 
-pub fn calc_rect(info: CalcInfo) -> Vec<u16>
+fn create_split_infos(info: &CalcInfo, task_num: usize, is_horizontal_split: bool) -> Vec<CalcInfo>
+{
+    let x = info.start.x as u32;
+    let y = info.start.y as u32;
+    let mut infos = Vec::with_capacity(task_num);
+
+    if is_horizontal_split {
+        let dw = info.width / task_num as u32;
+        for i in 0..task_num as u32 {
+            let x = x + dw * i;
+            let w = if i as usize == (task_num - 1) {
+                info.width - (dw * i)
+            } else {
+                dw
+            };
+            infos.push(CalcInfo::new(
+                x, y, w, info.height, info.max_itr, info.size, info.center, info.range,
+                info.func.clone(), info.deriv.clone(), info.coeff,
+            ));
+        }
+    } else {
+        let dh = info.height / task_num as u32;
+        for i in 0..task_num as u32 {
+            let y = y + dh * i;
+            let h = if i as usize == (task_num - 1) {
+                info.height - (dh * i)
+            } else {
+                dh
+            };
+            infos.push(CalcInfo::new(
+                x, y, info.width, h, info.max_itr, info.size, info.center, info.range,
+                info.func.clone(), info.deriv.clone(), info.coeff,
+            ));
+        }
+    }
+
+    infos
+}
+
+fn calc_rect_parallel(info: &CalcInfo) -> Vec<u16>
 {
     let w = info.width as usize;
     let h = info.height as usize;
@@ -256,6 +295,44 @@ pub fn calc_rect(info: CalcInfo) -> Vec<u16>
     calc_edge(&mut buffer, &mut is_pushed, &mut boundaries, &info);
     track_boundary(&mut buffer, &mut is_pushed, &mut boundaries, &info);
     fill_in_the_rest(&mut buffer, info.width, info.height);
+
+    buffer
+}
+
+pub fn calc_rect(info: CalcInfo) -> Vec<u16>
+{
+    const TASKS_RATE: usize = 8; // フラクタルは場所によって計算コストが大幅に異なるので、タスクを細かく分割するように補正をかける
+    let n = (rayon::current_num_threads() * TASKS_RATE).max(1);
+    let w = info.width as usize;
+    let h = info.height as usize;
+
+    let is_horizontal = info.width > info.height;
+    let infos = create_split_infos(&info, n, is_horizontal);
+
+    let mut buffer = vec![UNCALCULATED; w * h];
+    let results: Vec<Vec<u16>> = infos.into_par_iter()
+        .map(|info| calc_rect_parallel(&info))
+        .collect();
+
+    if is_horizontal {
+        let mut x_offset = 0;
+        for result in results {
+            let sub_w = result.len() / h;
+            for y in 0..h {
+                let start = y * w + x_offset;
+                let sub_start = y * sub_w;
+                buffer[start..(start+sub_w)].copy_from_slice(&result[sub_start..(sub_start+sub_w)]);
+            }
+            x_offset += sub_w;
+        }
+    } else {
+        let mut offset = 0;
+        for result in results {
+            let len = result.len();
+            buffer[offset..(offset+len)].copy_from_slice(&result);
+            offset += len;
+        }
+    }
 
     buffer
 }
