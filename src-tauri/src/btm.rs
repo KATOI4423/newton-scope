@@ -98,11 +98,13 @@ impl CalcInfo
     }
 }
 
+#[inline]
 fn newton_method(z: Complex<f64>, a: Complex<f64>, func: &Func, deriv: &Func) -> Complex<f64>
 {
     z - func(&[z]) / deriv(&[z]) * a
 }
 
+#[inline]
 fn is_same(lhs: Complex<f64>, rhs: Complex<f64>, relative_error: f64) -> bool
 {
     let delta = lhs - rhs;
