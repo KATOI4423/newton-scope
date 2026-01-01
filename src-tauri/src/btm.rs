@@ -1,12 +1,16 @@
+use bitvec::prelude::*;
 use num_complex::Complex;
 use num_traits::Zero;
 use rayon::prelude::*;
 use std::ops::{
-    Add, AddAssign,
+    Add,
 };
 use std::collections::VecDeque;
-
 use crate::calculate::Func;
+
+const UNCALCULATED: u16 = u16::MAX;
+
+type PushedFlags = BitSlice<u8, Lsb0>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Coordinates {
@@ -15,6 +19,7 @@ pub struct Coordinates {
 }
 
 impl Coordinates {
+    #[inline]
     const fn all_directions() -> [Self; 8] {
         [
             Self { x: -1, y: -1 }, Self { x: 0, y: -1 }, Self { x: 1, y: -1 },
@@ -23,17 +28,20 @@ impl Coordinates {
         ]
     }
 
-    /// # 指定された矩形領域内の座標かどうかを判定する
+    /// # 指定された矩形内の座標かどうかを判定する
     ///
-    /// ## Params
-    ///  - min: 矩形領域の最小座標の組
-    ///  - max: 矩形領域の最大座標の組
-    ///
-    /// # Returns
-    ///  - true: `min <= self < max`
-    ///  - false: `self < min` or `max <= self`
-    fn is_in_rect(&self, min: &Self, max: &Self) -> bool {
-        (min.x <= self.x && self.x < max.x) && (min.y <= self.y && self.y < max.y)
+    /// ## Returns
+    ///  - true: `{0, 0} <= self < {width, height}`
+    ///  - false: `self < {0, 0}` or `{width, height} <= self`
+    #[inline]
+    fn is_in_rect(&self, width: i64, height: i64) -> bool {
+        (0 <= self.x && self.x < width) && (0 <= self.y && self.y < height)
+    }
+
+    /// # 2次元配列用の引数[y][x]の組から、1次元配列用の引数[idx]を計算する
+    #[inline]
+    fn to_index(&self, width: i64) -> usize {
+        (self.y * width + self.x) as usize
     }
 }
 
@@ -44,17 +52,11 @@ impl Add for Coordinates {
     }
 }
 
-impl AddAssign for Coordinates {
-    fn add_assign(&mut self, rhs: Self) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-    }
-}
-
 pub struct CalcInfo
 {
     pub start:  Coordinates,
-    pub rect:   Coordinates,
+    pub width:  u32,
+    pub height: u32,
     pub max_itr:u16,
     pub size:   f64,
     pub center: Complex<f64>,
@@ -81,22 +83,18 @@ impl CalcInfo
     ) -> Self {
         Self {
             start: Coordinates{ x: x as i64, y: y as i64 },
-            rect:  Coordinates{ x: w as i64, y: h as i64 },
+            width: w, height: h,
             max_itr, size, center, range, func, deriv,
             coeff,
         }
     }
 
-    fn x_axis(&self) -> Vec<f64> {
-        (0..self.rect.x).into_iter().map(|idx|
-            ((self.start.x + idx) as f64 / self.size - 0.50) * self.range + self.center.re
-        ).collect()
-    }
-
-    fn y_axis(&self) -> Vec<f64> {
-        (0..self.rect.y).into_iter().map(|idx|
-            ((self.start.y + idx) as f64 / self.size - 0.50) * self.range + self.center.im
-        ).collect()
+    #[inline]
+    fn get_complex(&self, x: i64, y: i64) -> Complex<f64> {
+        Complex::new(
+            ((self.start.x + x) as f64 / self.size - 0.50) * self.range + self.center.re,
+            ((self.start.y + y) as f64 / self.size - 0.50) * self.range + self.center.im
+        )
     }
 }
 
@@ -139,152 +137,125 @@ fn calc_escape_time(z: Complex<f64>, a: Complex<f64>, func: &Func, deriv: &Func,
     max_itr
 }
 
-fn push_boundary(
-    boundaries: &mut VecDeque<Coordinates>,
-    is_pushed: &mut Vec<Vec<bool>>,
-    x: usize, y: usize,
+/// # 値をセットし、境界条件ならqueueに追加
+#[inline]
+fn update_boundary(
+    buffer: &mut [u16],
+    is_pushed: &mut PushedFlags,
+    queue: &mut VecDeque<Coordinates>,
+    idx: usize,
+    prev_idx: usize,
+    coord: Coordinates,
+    val: u16,
 ) {
-    if is_pushed[y][x] {
-        return;
+    buffer[idx] = val;
+    if !is_pushed[idx] && (val != buffer[prev_idx]) {
+        is_pushed.set(idx, true);
+        queue.push_back(coord);
     }
-
-    is_pushed[y][x] = true;
-    boundaries.push_back(Coordinates { x: x as i64, y: y as i64 });
 }
 
 fn calc_edge(
-    rect: &mut Vec<Vec<u16>>,
-    is_pushed: &mut Vec<Vec<bool>>,
+    buffer: &mut [u16],
+    is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
     info: &CalcInfo,
-    x_axis: &Vec<f64>,
-    y_axis: &Vec<f64>,
 ) {
-    let x_max = info.rect.x as usize - 1;
-    let y_max = info.rect.y as usize - 1;
+    let w: i64 = info.width as i64;
+    let h = info.height as i64;
 
-    rect[0][0] = calc_escape_time(
-        Complex::new(x_axis[0], y_axis[0]),
-        info.coeff, &info.func, &info.deriv, info.max_itr
-    );
-    rect[y_max][0] = calc_escape_time(
-        Complex::new(x_axis[0], y_axis[y_max]),
-        info.coeff, &info.func, &info.deriv, info.max_itr
-    );
-
-    for idx in 1..=x_max {
-        rect[0][idx] = calc_escape_time(
-            Complex::new(x_axis[idx], y_axis[0]),
-            info.coeff, &info.func, &info.deriv, info.max_itr
-        );
-        if rect[0][idx] != rect[0][idx - 1] {
-            push_boundary(boundaries, is_pushed, idx, 0);
-        }
-
-        rect[y_max][idx] = calc_escape_time(
-            Complex::new(x_axis[idx], y_axis[y_max]),
-            info.coeff, &info.func, &info.deriv, info.max_itr
-        );
-        if rect[y_max][idx] != rect[y_max][idx - 1] {
-            push_boundary(boundaries, is_pushed, idx, y_max);
-        }
+    // 上辺 (y=0)
+    let idx_start = 0;
+    buffer[idx_start] = calc_escape_time(info.get_complex(0, 0), info.coeff, &info.func, &info.deriv, info.max_itr);
+    for x in 1..w {
+        let idx = x as usize;
+        let val = calc_escape_time(info.get_complex(x, 0), info.coeff, &info.func, &info.deriv, info.max_itr);
+        update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: 0 }, val);
     }
 
-    for idx in 1..y_max {
-        rect[idx][0] = calc_escape_time(
-            Complex::new(x_axis[0], y_axis[idx]),
-            info.coeff, &info.func, &info.deriv, info.max_itr
-        );
-        if rect[idx][0] != rect[idx - 1][0] {
-            push_boundary(boundaries, is_pushed, 0, idx);
-        }
+    // 下辺 (y=h-1)
+    let y_bottom = h - 1;
+    let offset_bottom = (y_bottom * w) as usize;
+    buffer[offset_bottom] = calc_escape_time(info.get_complex(0, y_bottom), info.coeff, &info.func, &info.deriv, info.max_itr);
+    for x in 1..w {
+        let idx = offset_bottom + x as usize;
+        let val = calc_escape_time(info.get_complex(x, y_bottom), info.coeff, &info.func, &info.deriv, info.max_itr);
+        update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: y_bottom }, val);
+    }
 
-        rect[idx][x_max] = calc_escape_time(
-            Complex::new(x_axis[x_max], y_axis[idx]),
-            info.coeff, &info.func, &info.deriv, info.max_itr
-        );
-        if rect[idx][x_max] != rect[idx - 1][x_max] {
-            push_boundary(boundaries, is_pushed, x_max, idx);
+    // 右辺・左辺 (y=1..h-1)
+    for y in 1..(h - 1) {
+        for x in [0, w - 1] {
+            let idx = ((y * w) + x) as usize;
+            let idx_above = idx - w as usize ; // 上のマスと比較
+            let val = calc_escape_time(info.get_complex(x, y), info.coeff, &info.func, &info.deriv, info.max_itr);
+            update_boundary(buffer, is_pushed, boundaries, idx, idx_above, Coordinates { x, y }, val);
         }
     }
 }
 
 fn track_boundary(
-    rect: &mut Vec<Vec<u16>>,
-    is_pushed: &mut Vec<Vec<bool>>,
+    buffer: &mut [u16],
+    is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
     info: &CalcInfo,
-    x_axis: &Vec<f64>,
-    y_axis: &Vec<f64>,
 ) {
-    const MIN: Coordinates = Coordinates { x: 1, y: 1 }; // { x:0, y:0 } は `calc_edge` で計算済みのため、{ 1, 1 } から計算に使用する
-    let max = Coordinates { x: info.rect.x, y: info.rect.y };
+    let w = info.width as i64;
+    let h = info.height as i64;
 
     while let Some(boundary) = boundaries.pop_back() {
+        let boundary_val = buffer[boundary.to_index(w)];
+
         for d in Coordinates::all_directions() {
             let target = boundary + d;
-            if !target.is_in_rect(&MIN, &max) {
+            if !target.is_in_rect(w, h) {
                 continue;
             }
 
-            let (x, y) = (target.x as usize, target.y as usize);
-            if rect[y][x] == 0 /* default value */ {
-                rect[y][x] = calc_escape_time(
-                    Complex::new(x_axis[x], y_axis[y]),
-                    info.coeff, &info.func, &info.deriv, info.max_itr
-                );
+            let idx = target.to_index(w);
+            if buffer[idx] == UNCALCULATED {
+                buffer[idx] = calc_escape_time(info.get_complex(target.x, target.y), info.coeff, &info.func, &info.deriv, info.max_itr);
             }
-            if !is_pushed[y][x] && (rect[y][x] != rect[y][x - 1]) {
-                push_boundary(boundaries, is_pushed, x, y);
+            if (buffer[idx] != boundary_val) && !is_pushed[idx] {
+                is_pushed.set(idx, true);
+                boundaries.push_back(target);
             }
         }
     }
 }
 
-fn fill_in_the_rest(rect: &mut Vec<Vec<u16>>)
+fn fill_in_the_rest(buffer: &mut [u16], width: u32, height: u32)
 {
-    for y in 1..(rect.len() - 1) {
-        let mut boundary = rect[y][0];
-        for x in 1..(rect[y].len() - 1) {
-            match rect[y][x] {
-                0
-                    => rect[y][x] = boundary,
-                value if value == boundary
-                    => (), // nothing to do
-                other
-                    => boundary = other, // 境界値を更新
-            }
-        }
-    }
-}
+    let w = width as usize;
+    let h = height as usize;
 
-fn from(matrix: &mut Vec<Vec<u16>>) -> Vec<u16>
-{
-    match matrix.len() {
-        0 => Vec::new(),
-        _ => {
-            let mut ret = Vec::with_capacity(matrix.len() * matrix[0].len());
-            for col in matrix.iter() {
-                for val in col.iter() {
-                    ret.push(*val);
-                }
+    for y in 1..(h - 1) {
+        let row_start = y * w;
+        let mut fill_value = buffer[row_start];
+
+        for x in 1..(w - 1) {
+            let idx = row_start + x;
+            match buffer[idx] {
+                UNCALCULATED => buffer[idx] = fill_value,
+                other => fill_value = other, // 計算済みのセルに当たったら、使用する値を更新
             }
-            ret
         }
     }
 }
 
 pub fn calc_rect(info: CalcInfo) -> Vec<u16>
 {
+    let w = info.width as usize;
+    let h = info.height as usize;
+    let len = w * h;
+
     let mut boundaries = VecDeque::new();
-    let mut is_pushed = vec![vec![false; info.rect.x.try_into().unwrap()]; info.rect.y.try_into().unwrap()];
-    let mut rect = vec![vec![0; info.rect.x.try_into().unwrap()]; info.rect.y.try_into().unwrap()];
-    let x = info.x_axis();
-    let y = info.y_axis();
+    let mut is_pushed = bitvec![u8, Lsb0; 0 /* false  */; len];
+    let mut buffer = vec![UNCALCULATED; len];
 
-    calc_edge(&mut rect, &mut is_pushed, &mut boundaries, &info, &x, &y);
-    track_boundary(&mut rect, &mut is_pushed, &mut boundaries, &info, &x, &y);
-    fill_in_the_rest(&mut rect);
+    calc_edge(&mut buffer, &mut is_pushed, &mut boundaries, &info);
+    track_boundary(&mut buffer, &mut is_pushed, &mut boundaries, &info);
+    fill_in_the_rest(&mut buffer, info.width, info.height);
 
-    from(&mut rect)
+    buffer
 }
