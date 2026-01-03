@@ -5,6 +5,9 @@ use num_traits::{
     FromPrimitive,
 };
 use once_cell::sync::Lazy;
+use serde::{
+    Serialize, Deserialize,
+};
 use std::sync::{
     Arc,
     Mutex,
@@ -50,14 +53,7 @@ struct Formulac
 }
 
 impl Formulac {
-    fn new() -> Self {
-        Self {
-            vars: formulac::Variables::new(),
-            usrs: formulac::UserDefinedTable::new(),
-            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
-            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
-        }
-    }
+    fn new() -> Self { std::default::Default::default() }
 
     #[allow(dead_code)]
     fn set_vars(&mut self, vars: &[(&str, Complex<f64>)]) {
@@ -101,8 +97,19 @@ impl Formulac {
     }
 }
 
+impl Default for Formulac {
+    fn default() -> Self {
+        Self {
+            vars: formulac::Variables::new(),
+            usrs: formulac::UserDefinedTable::new(),
+            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+        }
+    }
+}
 
 /// 複素数平面の情報を保持する構造体
+#[derive(Serialize, Deserialize)]
 struct Canvas<T>
     where T: Float + FromPrimitive,
 {
@@ -112,13 +119,7 @@ struct Canvas<T>
 }
 
 impl<T: Float + FromPrimitive> Canvas<T> {
-    fn new() -> Self {
-        Self {
-            center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
-            zoom_level: default::CANVAS_ZOOM_LEVEL,
-            size: default::CANVAS_SIZE,
-        }
-    }
+    fn new() -> Self { std::default::Default::default() }
 
     fn set_center(&mut self, re: T, im: T) {
         self.center.re = re;
@@ -182,9 +183,22 @@ impl<T: Float + FromPrimitive> Canvas<T> {
     }
 }
 
+impl<T: Float + FromPrimitive> Default for Canvas<T>
+{
+    fn default() -> Self {
+        Self {
+            center: num_complex::Complex::<T>::new(T::zero(), T::zero()),
+            zoom_level: default::CANVAS_ZOOM_LEVEL,
+            size: default::CANVAS_SIZE,
+        }
+    }
+}
+
 
 /// フラクタル計算に使用する情報を保持する構造体
+#[derive(Serialize, Deserialize)]
 struct Fractal {
+    #[serde(skip)] // 数式文字列の情報のみで良いだめ、Formulacはserializeしない
     formulac:   Formulac,
     canvas:     Canvas<f64>,
     max_iter:   u16,
@@ -192,13 +206,7 @@ struct Fractal {
 
 
 impl Fractal {
-    fn new() -> Self {
-        Self {
-            formulac:   Formulac::new(),
-            canvas:     Canvas::new(),
-            max_iter:   default::FRACTAL_MAX_ITER,
-        }
-    }
+    fn new() -> Self { std::default::Default::default() }
 
     fn formulac(&self) -> &Formulac {
         &self.formulac
@@ -222,6 +230,16 @@ impl Fractal {
 
     fn max_iter(&self) -> u16 {
         self.max_iter
+    }
+}
+
+impl Default for Fractal {
+    fn default() -> Self {
+        Self {
+            formulac:   Formulac::new(),
+            canvas:     Canvas::new(),
+            max_iter:   default::FRACTAL_MAX_ITER,
+        }
     }
 }
 
