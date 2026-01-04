@@ -124,8 +124,6 @@ struct Canvas<T>
 }
 
 impl<T: Float + FromPrimitive> Canvas<T> {
-    fn new() -> Self { std::default::Default::default() }
-
     fn set_center(&mut self, re: T, im: T) {
         self.center.re = re;
         self.center.im = im;
@@ -211,8 +209,6 @@ struct Fractal {
 
 
 impl Fractal {
-    fn new() -> Self { std::default::Default::default() }
-
     fn formulac(&self) -> &Formulac {
         &self.formulac
     }
@@ -242,7 +238,7 @@ impl Default for Fractal {
     fn default() -> Self {
         Self {
             formulac:   Formulac::default(),
-            canvas:     Canvas::new(),
+            canvas:     Canvas::default(),
             max_iter:   default::FRACTAL_MAX_ITER,
         }
     }
