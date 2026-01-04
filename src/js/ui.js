@@ -41,9 +41,15 @@ const state = {
 };
 
 const invoke = window.__TAURI__.core.invoke;
-const { confirm, message } = window.__TAURI__.dialog;
-
-
+const {
+    confirm,
+    message,
+    save,
+} = window.__TAURI__.dialog;
+const {
+    join,
+    pictureDir,
+} = window.__TAURI__.path;
 // ----- Utilities -----------------------------
 
 /**
@@ -365,5 +371,40 @@ elements.presetSize.addEventListener('change', async () => {
 elements.resetBtn.addEventListener('click', () => {
     setDefault(true);
 });
+
+elements.saveBtn.addEventListener('click', async () => {
+    await withSpinner(async () => {
+        try {
+            const formula = elements.fexpr.value;
+            const defaultPath = await join(await pictureDir(), 'NewtonFractal.png');
+            let path = await save({
+                title: 'Save to File',
+                defaultPath: defaultPath,
+                filters: [{
+                    name: 'Newton Fractal Image (PNG)',
+                    extensions: ['png'],
+                }],
+            });
+
+            if (!path) {
+                console.info('Canceled to save');
+                return;
+            }
+            if (!path.toLowerCase().endsWith('.png')) {
+                path += '.png';
+            }
+
+            await invoke('save_png', { formula, path });
+            console.info('Success to save to:', path);
+            await message(`Success to save to ${path}`, {
+                title: 'Finished to save',
+                kind: 'info'
+            });
+        } catch (error) {
+            console.error('Failed to save:', error);
+            await message(error, { title: 'Failed to save png file', kind: 'error' });
+        }
+    });
+})
 
 window.addEventListener("DOMContentLoaded", initialize);

@@ -24,8 +24,17 @@
           "identifier": "dialog",
           "windows": ["*"],
           "permissions": [
+            "dialog:allow-save",
             "dialog:allow-confirm",
             "dialog:allow-message"
+          ]
+        },
+        {
+          "identifier": "fs",
+          "windows": ["*"],
+          "permissions": [
+            "core:path:default",
+            "core:path:allow-resolve-directory"
           ]
         }
       ],

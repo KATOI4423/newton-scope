@@ -5,6 +5,7 @@ use num_traits::{
     FromPrimitive,
 };
 use once_cell::sync::Lazy;
+use png;
 use serde::{
     Serialize, Deserialize,
 };
@@ -396,4 +397,57 @@ pub async fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u16>, Str
         Ok(data) => Ok(data),
         Err(e) => Err(e.to_string())
     }
+}
+
+fn jet(t: f64) -> [u8; 4] {
+    const MIN: f64 = 0.0;
+    const MAX: f64 = 1.0;
+    let t = t.clamp(MIN, MAX);
+    let r = (1.5 - (4.0 * t - 3.0).abs()).clamp(MIN, MAX);
+    let g = (1.5 - (4.0 * t - 2.0).abs()).clamp(MIN, MAX);
+    let b = (1.5 - (4.0 * t - 1.0).abs()).clamp(MIN, MAX);
+
+    [
+        (r * u8::MAX as f64) as u8,
+        (g * u8::MAX as f64) as u8,
+        (b * u8::MAX as f64) as u8,
+        u8::MAX, // Alphaは常に1.0
+    ]
+}
+
+fn apply_color_map(buffer: Vec<u16>, max_iter: u16) -> Vec<u8> {
+    buffer.iter()
+        .flat_map(|&iter| jet(iter as f64 / max_iter as f64))
+        .collect()
+}
+
+#[tauri::command]
+pub async fn save_png(formula: String, path: String) -> Result<(), String> {
+    let (metadata, size, max_iter) = {
+        let fractal = FRACTAL.lock()
+            .map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))?;
+        let size = fractal.canvas().size();
+        let max_iter = fractal.max_iter();
+        let metadata = serde_json::to_string(&*fractal)
+            .map_err(|e| format!("Inner Error: JSON serialization failed: {}", e))?;
+        (metadata, size as u32, max_iter)
+    };
+
+    let calc_data = render_tile(0, 0, size, size).await?;
+    let rgba_data = apply_color_map(calc_data, max_iter);
+
+    let file = std::fs::File::create(&path)
+        .map_err(|e| e.to_string())?;
+    let mut writer = std::io::BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(&mut writer, size, size);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let _ = encoder.add_text_chunk("FractalParameters".to_string(), metadata);
+    let _ = encoder.add_text_chunk("Formula".to_string(), formula.to_string());
+
+    let mut png_writer = encoder.write_header().map_err(|e| e.to_string())?;
+    png_writer.write_image_data(&rgba_data).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
