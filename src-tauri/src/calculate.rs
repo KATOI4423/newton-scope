@@ -54,7 +54,14 @@ struct Formulac
 }
 
 impl Formulac {
-    fn new() -> Self { std::default::Default::default() }
+    fn new() -> Self {
+        Self {
+            vars: formulac::Variables::new(),
+            usrs: formulac::UserDefinedTable::new(),
+            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+        }
+    }
 
     #[allow(dead_code)]
     fn set_vars(&mut self, vars: &[(&str, Complex<f64>)]) {
@@ -100,12 +107,9 @@ impl Formulac {
 
 impl Default for Formulac {
     fn default() -> Self {
-        Self {
-            vars: formulac::Variables::new(),
-            usrs: formulac::UserDefinedTable::new(),
-            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
-            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
-        }
+        let mut default = Self::new();
+        let _ = default.set_formula(default::FORMULA); // 失敗しないので
+        default
     }
 }
 
@@ -237,7 +241,7 @@ impl Fractal {
 impl Default for Fractal {
     fn default() -> Self {
         Self {
-            formulac:   Formulac::new(),
+            formulac:   Formulac::default(),
             canvas:     Canvas::new(),
             max_iter:   default::FRACTAL_MAX_ITER,
         }
@@ -246,14 +250,13 @@ impl Default for Fractal {
 
 
 static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
-    Mutex::new(Fractal::new())
+    Mutex::new(Fractal::default())
 });
 
 /// FRACTALの初期化関数
 #[tauri::command]
 pub fn initialize() {
-    let mut fractal = Fractal::new();
-    fractal.formulac_mut().set_formula(default::FORMULA).unwrap();
+    let fractal = Fractal::default();
 
     *FRACTAL.lock().unwrap() = fractal;
 }
