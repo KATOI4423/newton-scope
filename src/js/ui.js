@@ -375,7 +375,6 @@ elements.resetBtn.addEventListener('click', () => {
 elements.saveBtn.addEventListener('click', async () => {
     await withSpinner(async () => {
         try {
-            const formula = elements.fexpr.value;
             const defaultPath = await join(await pictureDir(), 'NewtonFractal.png');
             let path = await save({
                 title: 'Save to File',
@@ -394,7 +393,7 @@ elements.saveBtn.addEventListener('click', async () => {
                 path += '.png';
             }
 
-            await invoke('save_png', { formula, path });
+            await invoke('save_png', { path });
             console.info('Success to save to:', path);
             await message(`Success to save to ${path}`, {
                 title: 'Finished to save',

@@ -201,8 +201,9 @@ impl<T: Float + FromPrimitive> Default for Canvas<T>
 /// フラクタル計算に使用する情報を保持する構造体
 #[derive(Serialize, Deserialize)]
 struct Fractal {
-    #[serde(skip)] // 数式文字列の情報のみで良いだめ、Formulacはserializeしない
+    #[serde(skip)] // 数式文字列の情報のみで良いため、Formulacはserializeしない
     formulac:   Formulac,
+    formula:    String,
     canvas:     Canvas<f64>,
     max_iter:   u16,
 }
@@ -215,6 +216,16 @@ impl Fractal {
 
     fn formulac_mut(&mut self) ->&mut Formulac {
         &mut self.formulac
+    }
+
+    fn set_formula(&mut self, formula: &str) -> Result<(), String> {
+        self.formulac_mut().set_formula(formula)?;
+        self.formula = formula.to_string();
+        Ok(())
+    }
+
+    fn formula(&self) -> &str {
+        &self.formula
     }
 
     fn canvas(&self) -> &Canvas<f64> {
@@ -238,6 +249,7 @@ impl Default for Fractal {
     fn default() -> Self {
         Self {
             formulac:   Formulac::default(),
+            formula:    default::FORMULA.to_string(),
             canvas:     Canvas::default(),
             max_iter:   default::FRACTAL_MAX_ITER,
         }
@@ -312,7 +324,7 @@ pub fn get_default_max_iter() -> i32 {
 pub async fn set_formula(formula: String) -> Result<(), String> {
     let result = tauri::async_runtime::spawn_blocking(move || -> String {
         let mut fractal = FRACTAL.lock().unwrap();
-        match fractal.formulac_mut().set_formula(&formula) {
+        match fractal.set_formula(&formula) {
             Ok(_) => "".to_string(),
             Err(e) => e.to_string(),
         }
@@ -421,7 +433,7 @@ fn apply_color_map(buffer: Vec<u16>, max_iter: u16) -> Vec<u8> {
 }
 
 #[tauri::command]
-pub async fn save_png(formula: String, path: String) -> Result<(), String> {
+pub async fn save_png(path: String) -> Result<(), String> {
     let (metadata, size, max_iter) = {
         let fractal = FRACTAL.lock()
             .map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))?;
@@ -443,7 +455,6 @@ pub async fn save_png(formula: String, path: String) -> Result<(), String> {
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let _ = encoder.add_text_chunk("FractalParameters".to_string(), metadata);
-    let _ = encoder.add_text_chunk("Formula".to_string(), formula.to_string());
 
     let mut png_writer = encoder.write_header().map_err(|e| e.to_string())?;
     png_writer.write_image_data(&rgba_data).map_err(|e| e.to_string())?;
