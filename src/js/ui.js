@@ -283,11 +283,12 @@ elements.canvas.addEventListener('wheel', (e) => {
 async function setFexpr() {
     await withSpinner(async () => {
         const f = elements.fexpr.value;
-        const ret = await invoke("set_formula", { formula: f });
-        if (ret !== "OK") {
+        try {
+            await invoke("set_formula", { formula: f });
+        } catch (e) {
             elements.fexpr.value = state.prevFormula;
-            await message(ret, { title: "Failed to set f(z)", kind: "error" });
-            throw Error("Failed to set formula", f, ret);
+            await message(e, { title: "Failed to set f(z)", kind: "error" });
+            throw Error("Failed to set formula", f, e);
         }
 
         const size = Number(elements.presetSize.value);
