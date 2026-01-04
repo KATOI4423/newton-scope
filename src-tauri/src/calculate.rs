@@ -369,20 +369,27 @@ pub fn zoom_view(level: i32, x: f64, y: f64) {
 ///  - w: 矩形領域の幅
 ///  - h: 矩形領域の高さ
 #[tauri::command]
-pub fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Vec<u16> {
-    let info = {
-        let fractal = FRACTAL.lock().unwrap();
-        btm::CalcInfo::new(
-            x, y, w, h,
-            fractal.max_iter(),
-            fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
-            fractal.canvas().center(),
-            fractal.canvas().width(),
-            fractal.formulac().func().clone(),
-            fractal.formulac().deriv().clone(),
-            Complex::ONE, // TODO: UIから変更できるようにする？
-        )
-    };
+pub async fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u16>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let info = {
+            let fractal = FRACTAL.lock().unwrap();
+            btm::CalcInfo::new(
+                x, y, w, h,
+                fractal.max_iter(),
+                fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
+                fractal.canvas().center(),
+                fractal.canvas().width(),
+                fractal.formulac().func().clone(),
+                fractal.formulac().deriv().clone(),
+                Complex::ONE, // TODO: UIから変更できるようにする？
+            )
+        };
 
-    btm::calc_rect(info)
+        btm::calc_rect(info)
+    }).await;
+
+    match result {
+        Ok(data) => Ok(data),
+        Err(e) => Err(e.to_string())
+    }
 }
