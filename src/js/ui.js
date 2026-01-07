@@ -104,13 +104,14 @@ async function setDefault(isUserClidked) {
     elements.fexpr.value = defaultFormula;
     state.prevFormula = defaultFormula;
 
+    setSize(defaultSize);
     elements.presetSize.value = defaultSize;
 
     syncMaxIterInputs(defaultMaxIter);
     updateMaxIter(defaultMaxIter);
     state.prevMaxIter = defaultMaxIter;
 
-    await Promise.all([updateInfoStr(), setSize()]);
+    await Promise.all([updateInfoStr(), invoke("set_size", { size: defaultSize })]);
     await withSpinner(async () => updateTile(defaultSize, defaultSize));
 }
 
@@ -353,19 +354,17 @@ async function innerSetMaxIter(value) {
     }
 }
 
-async function setSize() {
-    const value = Number(elements.presetSize.value);
+function setSize(value) {
     elements.canvas.width = value;
     elements.canvas.height = value;
 
     updateViewport(value);
     resizeTexture(value);
-
-    await invoke("set_size", { size: value });
 }
 elements.presetSize.addEventListener('change', async () => {
     const size = Number(elements.presetSize.value);
-    await setSize();
+    setSize(size);
+    await invoke("set_size", { size });
     await withSpinner(async () => updateTile(size, size));
 });
 
@@ -449,14 +448,12 @@ elements.importBtn.addEventListener('click', async () => {
         // 処理が成功した後でパラメータ類を更新する
         elements.fexpr.value = formula;     state.prevFormula = formula;
         elements.presetSize.value = size;
+        setSize(size);
 
         syncMaxIterInputs(maxIter); updateMaxIter(maxIter); state.prevMaxIter = maxIter;
         elements.center.textContent = center;
         elements.scale.textContent = scale;
 
-        elements.canvas.width = size;       elements.canvas.height = size;
-        updateViewport(size);
-        resizeTexture(size);
         await updateTile(size, size);
     })
 })
