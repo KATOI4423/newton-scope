@@ -444,7 +444,23 @@ pub async fn save_png(path: String) -> Result<(), String> {
         (metadata, size as u32, max_iter)
     };
 
-    let calc_data = render_tile(0, 0, size, size).await?;
+    let calc_data = {
+        let mut raw_data = render_tile(0, 0, size, size).await?;
+        let size = size as usize;
+
+        // canvasとy軸が反転しているので、行の順番を逆転させる
+        // chunks(size).rev().flat_map(|row| row.iter().copied()).collect() でも実装可能だが、
+        // メモリ消費量を抑えるために、インプレースする
+        for i in 0..(size / 2) {
+            let top = i * size;
+            let bottom = (size - i - 1) * size;
+            for x in 0..size {
+                raw_data.swap(top + x, bottom + x);
+            }
+        }
+
+        raw_data
+    };
     let rgba_data = apply_color_map(calc_data, max_iter);
 
     let file = std::fs::File::create(&path)
