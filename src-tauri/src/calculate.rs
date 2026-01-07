@@ -477,3 +477,52 @@ pub async fn save_png(path: String) -> Result<(), String> {
 
     Ok(())
 }
+
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    formula:    String,
+    size:       u32,
+    max_iter:   u16,
+    center_str: String,
+    scale_str:  String,
+}
+
+#[tauri::command]
+pub async fn import_from_png(path: String) -> Result<ImportResult, String> {
+    let file = std::fs::File::open(&path)
+        .map_err(|e| e.to_string())?;
+    let reader = std::io::BufReader::new(file);
+
+    let decoder = png::Decoder::new(reader);
+    let reader = decoder.read_info()
+        .map_err(|e| e.to_string())?;
+
+    let metadata_text = reader.info().uncompressed_latin1_text.iter()
+        .find(|chunk| chunk.keyword == "FractalParameters")
+        .ok_or(format!("Not Found Fractal Parameters in {}.", &path))?;
+
+
+    let (formula, size, max_iter) = {
+        // center_strとscale_strの取得時にFRACTALをlockするので、デッドロックしないように、
+        // FRACTALの設定時に応答値を同時に取得する
+        let mut fractal = FRACTAL.lock().map_err(|e| e.to_string())?;
+        *fractal = serde_json::from_str(&metadata_text.text).map_err(|e| e.to_string())?;
+
+        let formula = fractal.formula().to_string();
+        let size = fractal.canvas().size().into();
+        let max_iter = fractal.max_iter();
+
+        fractal.set_formula(&formula)?;
+        (formula, size, max_iter)
+    };
+
+    Ok(ImportResult {
+        formula,
+        size,
+        max_iter,
+        center_str: get_center_str(),
+        scale_str: get_scale_str(),
+    })
+}

@@ -44,6 +44,7 @@ const invoke = window.__TAURI__.core.invoke;
 const {
     confirm,
     message,
+    open,
     save,
 } = window.__TAURI__.dialog;
 const {
@@ -404,6 +405,60 @@ elements.saveBtn.addEventListener('click', async () => {
             await message(error, { title: 'Failed to save png file', kind: 'error' });
         }
     });
+})
+
+elements.importBtn.addEventListener('click', async () => {
+    await withSpinner(async () => {
+        let formula = "";
+        let size = 0;
+        let maxIter = 0;
+        let center = "";
+        let scale = "";
+
+        try {
+            const defaultPath = await join(await pictureDir(), 'NewtonFractal.png');
+            let path = await open({
+                title: 'Import from File',
+                defaultPath: defaultPath,
+                multiple: false,
+                directory: false,
+                filters: [{
+                    name: 'Newton Fractal Image (PNG)',
+                    extensions: ['png'],
+                }],
+            });
+            if (!path) {
+                console.info('Canceled to import');
+                return;
+            }
+
+            let importResults = await invoke('import_from_png', { path });
+
+            formula = importResults.formula;
+            size = Number(importResults.size);
+            maxIter = Number(importResults.maxIter);
+            center = importResults.centerStr;
+            scale = importResults.scaleStr;
+        } catch (error) {
+            console.error('Failed to import:', error);
+            await message(error, { title: 'Failed to import png file', kind: 'error' });
+            return;
+        }
+
+        // tryの中でパラメータ類を更新すると、エラー時にcatchの中でエラー前の値に復元する必要があるため、
+        // 処理が成功した後でパラメータ類を更新する
+        elements.fexpr.value = formula;     state.prevFormula = formula;
+        elements.presetSize.value = size;
+
+        syncMaxIterInputs(maxIter); updateMaxIter(maxIter); state.prevMaxIter = maxIter;
+        elements.center.textContent = center;
+        elements.scale.textContent = scale;
+
+        elements.canvas.width = size;       elements.canvas.height = size;
+        updateViewport(size);
+        resizeTexture(size);
+        await updateTile(size, size);
+    })
 })
 
 window.addEventListener("DOMContentLoaded", initialize);
