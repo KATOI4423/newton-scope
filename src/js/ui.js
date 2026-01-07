@@ -386,7 +386,7 @@ elements.saveBtn.addEventListener('click', async () => {
             });
 
             if (!path) {
-                console.info('Canceled to save');
+                console.info('Save canceled.');
                 return;
             }
             if (!path.toLowerCase().endsWith('.png')) {
@@ -427,7 +427,7 @@ elements.importBtn.addEventListener('click', async () => {
                 }],
             });
             if (!path) {
-                console.info('Canceled to import');
+                console.info('Import canceled.');
                 return;
             }
 
