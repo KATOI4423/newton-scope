@@ -16,6 +16,8 @@ const elements = {
     center:     document.getElementById('center'),
     scale:      document.getElementById('scale'),
     fexpr:      document.getElementById('fexpr'),
+    helpBtn:    document.getElementById('helpBtn'),
+    syntaxHelp: document.getElementById('syntaxHelp'),
     presetSize: document.getElementById('presetSize'),
     maxIter:    document.getElementById('maxIter'),
     iterRange:  document.getElementById('iterRange'),
@@ -115,9 +117,68 @@ async function setDefault(isUserClidked) {
     await withSpinner(async () => updateTile(defaultSize, defaultSize));
 }
 
+async function initSyntaxHelp() {
+    try {
+        // const syntax = await invoke("get_syntax_list");
+        const syntax = {
+            operators: ['+', '-', '*', '/'],
+            constants: ['PI', 'E', 'i'],
+            functions: ['sin', 'cos', 'tan', 'exp'],
+        };
+        const categories = [
+            { label: 'Operators', keys: syntax.operators },
+            { label: 'Constants', keys: syntax.constants },
+            { label: 'Functions', keys: syntax.functions },
+        ];
+
+        elements.syntaxHelp.innerHTML = categories.map(cat => `
+            <div class="syntax-section">
+                <strong>${cat.label}</strong>
+                ${cat.keys.map(k => `<span class="clickable">${k}</span>`).join('')}
+            </div>
+        `).join('');
+        elements.syntaxHelp.innerHTML += `
+            <div class="syntax-actions">
+                <button id="applyFexprBtn" class="primary-sm">Apply Formula</button>
+            </div>
+        `;
+
+        document.getElementById('applyFexprBtn').addEventListener('click', setFexpr);
+
+        elements.syntaxHelp.addEventListener('click', (e) => {
+            if (e.target.classList.contains('clickable')) {
+                const text = e.target.innerText;
+                const isFunction = syntax.functions.includes(text);
+                insertAtCursor(elements.fexpr, text, isFunction);
+            }
+        });
+    } catch (e) {
+        console.error("Failed to load syntax help:", e);
+    }
+}
+
+function insertAtCursor(input, text, isFunction) {
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const val = input.value;
+
+    const insertText = isFunction ? `${text}()` : text;
+    input.value = val.substring(0, start) + insertText + val.substring(end);
+
+    // 関数の場合、括弧 "(" の直後にカーソル移動させる
+    const newPos = isFunction ? start + text.length + 1 : start + text.length;
+
+    input.focus();
+    input.setSelectionRange(newPos, newPos);
+    elements.fexpr.value = input.value;
+
+    updateApplyButtonState();
+}
+
 /** GLSLと設定値を初期化 */
 async function initialize() {
     await initGLSetup();
+    await initSyntaxHelp();
     await setDefault(false);
 }
 
@@ -132,6 +193,19 @@ async function updateInfoStr() {
     ]);
     elements.center.textContent = center;
     elements.scale.textContent = scale;
+}
+
+/** fexprの状態をチェックして、applyボタンの見た目を更新する */
+function updateApplyButtonState() {
+    const applyBtn = document.getElementById('applyFexprBtn');
+    if (!applyBtn) return;
+
+    const isChanged = (elements.fexpr.value !== state.prevFormula);
+    if (isChanged) {
+        applyBtn.classList.add('is-dirty');
+    } else {
+        applyBtn.classList.remove('is-dirty');
+    }
 }
 
 
@@ -285,12 +359,21 @@ elements.canvas.addEventListener('wheel', (e) => {
     state.pendingZoom = { level, x: normX, y: normY };
 }, { passive: false });
 
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && elements.syntaxHelp.style.display === 'block') {
+        e.preventDefault();
+        elements.helpBtn.click(); // EscapeでsyntaxHelpを閉じる
+    }
+});
 
 // ----- UI Component Handlers -----------------
 
 async function setFexpr() {
     await withSpinner(async () => {
         const f = elements.fexpr.value;
+        if (f === state.prevFormula) {
+            return;
+        }
         try {
             await invoke("set_formula", { formula: f });
         } catch (e) {
@@ -302,9 +385,25 @@ async function setFexpr() {
         const size = Number(elements.presetSize.value);
         await updateTile(size, size);
         state.prevFormula = f;
+        updateApplyButtonState();
     });
 }
-elements.fexpr.addEventListener('change', setFexpr);
+elements.fexpr.addEventListener('input', updateApplyButtonState); // 入力を削除して元に戻した際に、ApplyBtnの状態を元に戻せるようにする
+elements.fexpr.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        // 入力欄からフォーカスを外して、入力が確定したことを視覚的に伝える
+        elements.fexpr.blur();
+        await setFexpr();
+    }
+});
+
+elements.helpBtn.addEventListener('click', () => {
+    const isHidden = elements.syntaxHelp.style.display === 'none';
+    elements.syntaxHelp.style.display = isHidden ? 'block' : 'none';
+    elements.helpBtn.innerText = isHidden ? 'x' : '?';
+    elements.helpBtn.title = isHidden ? 'Close syntax help' : 'Show syntax help';
+});
 
 function syncMaxIterInputs(value) {
     elements.maxIter.value = value;

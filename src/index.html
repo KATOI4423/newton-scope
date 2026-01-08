@@ -21,9 +21,12 @@
       <h2>Fractal Controls</h2>
 
       <div class="field">
-        <label for="fexpr">f(z) ― <span class="small">Enter a complex function of z</span></label>
+        <label for="fexpr">
+          f(z) ― <span class="small">Enter a complex function of z</span>
+          <button id="helpBtn" type="text" class="help-btn">?</button>
+        </label>
         <input id="fexpr" type="text" />
-        <div class="hint">hint text for fexpr</div>
+        <div id="syntaxHelp" class="syntax-help" style="display: none;"></div>
       </div>
 
       <div class="field">

@@ -167,6 +167,108 @@ button {
     }
 }
 
+.help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin-left: 6px;
+    border-radius: 50%;
+    font-size: 11px;
+    background: #246;
+    color: #fff;
+    border: 1px solid #ccc;
+    vertical-align: middle;
+}
+.help-btn:hover {
+    background: #468;
+}
+
+.syntax-help {
+    margin-top: 8px;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #444;
+    display: none; /* JSで制御 */
+}
+.syntax-section {
+    margin-bottom: 6px;
+}
+.syntax-section:last-child {
+    margin-bottom: 0;
+}
+.syntax-section strong {
+    display: block;
+    margin-bottom: 3px;
+    color: #222;
+}
+
+.syntax-actions {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+}
+.primary-sm {
+    background: #246;
+    color: #fff;
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.primary-sm:hover {
+    background: #468;
+}
+#applyFexprBtn {
+    transition: all 0.3s ease;
+}
+
+/* 点滅アニメーション */
+@keyframes pulse-highlight {
+    0% {
+        box-shadow: 0 0 0 0 rgba(34, 68, 102, 0.7);
+        background-color: #246;
+    }
+    50% {
+        box-shadow: 0 0 10px 4px rgba(34, 68, 102, 0.3);
+        background-color: #468;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 68, 102, 0);
+        background-color: #246;
+    }
+}
+/* このクラスが付与されると点滅する */
+.is-dirty {
+    animation: pulse-highlight 2s infinite;
+    border-color: #fff !important;
+    font-weight: bold;
+}
+
+.clickable {
+    display: inline-block;
+    padding: 2px 5px;
+    margin: 1px;
+    background: #fff;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: ui-monospace, monospace;
+    transition: all 0.1s;
+}
+.clickable:hover {
+    background: #f0f4f8;
+    border-color: #246;
+    color: #246;
+    transform: translateY(-1px);
+}
+
 /* responsive */
 
 @media (aspect-ratio < 1 / 1) {
