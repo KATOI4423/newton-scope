@@ -119,12 +119,7 @@ async function setDefault(isUserClidked) {
 
 async function initSyntaxHelp() {
     try {
-        // const syntax = await invoke("get_syntax_list");
-        const syntax = {
-            operators: ['+', '-', '*', '/'],
-            constants: ['PI', 'E', 'i'],
-            functions: ['sin', 'cos', 'tan', 'exp'],
-        };
+        const syntax = await invoke("get_available_syntax");
         const categories = [
             { label: 'Operators', keys: syntax.operators },
             { label: 'Constants', keys: syntax.constants },

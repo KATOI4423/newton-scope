@@ -19,7 +19,7 @@ tauri-build = { version = "2.5.3" }
 
 [dependencies]
 bitvec = { version = "1.0.1" }
-formulac = "0.5.2"
+formulac = "0.5.3"
 log = "0.4.29"
 num-complex = { version = "0.4.6", features = ["serde"] }
 num-traits = "0.2.19"

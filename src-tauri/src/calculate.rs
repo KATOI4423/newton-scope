@@ -274,6 +274,34 @@ pub fn get_default_formula() -> String {
     default::FORMULA.to_string()
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Syntax {
+    operators: Vec<String>,
+    constants: Vec<String>,
+    functions: Vec<String>,
+}
+
+#[tauri::command]
+pub fn get_available_syntax() -> Syntax {
+    let from = |vec: Vec<&str>| -> Vec<String> {
+        vec.iter().map(|str| str.to_string()).collect()
+    };
+
+    let operators = from(formulac::parser::BinaryOperatorKind::names());
+
+    let mut constants = from(formulac::parser::constant::names());
+    constants.push(formulac::lexer::IMAGINARY_UNIT.to_string());
+
+    let functions = from(formulac::parser::FunctionKind::names());
+
+    Syntax {
+        operators,
+        constants,
+        functions,
+    }
+}
+
 /// 指数表記の際に、小数点がない場合は ".0" を追加する
 fn format_with_decimal(x: f64) -> String {
     let s = format!("{:e}", x);

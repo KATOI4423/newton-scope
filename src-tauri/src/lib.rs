@@ -13,6 +13,7 @@ pub fn run() {
       calculate::initialize,
       calculate::import_from_png,
       calculate::save_png,
+      calculate::get_available_syntax,
       calculate::get_default_formula,
       calculate::get_default_size,
       calculate::get_default_max_iter,
