@@ -25,22 +25,29 @@ jobs:
             - name: install Rust stable
               uses: dtolnay/rust-toolchain@stable
 
+            - uses: swatinem/rust-cache@v2
+              with:
+                workspace: "./src-tauri-> target"
+
             - name: install dependencies (ubuntu only)
               if: contains(matrix.platform, 'ubuntu')
               run: |
                 sudo apt-get update
                 sudo apt-get install -y \
                     build-essential \
+                    clang \
                     libgtk-3-dev \
                     libcairo2-dev \
                     libjavascriptcoregtk-4.1-dev \
                     libsoup-3.0-dev \
                     libwebkit2gtk-4.1-dev \
+                    lld \
                     pkg-config \
 
             - uses: tauri-apps/tauri-action@v0
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                CARGO_INCREMENTAL: 0
               with:
                 tagName: app-v__VERSION__ # tauri.conf.json の version を元にタグを生成
                 releaseName: "Newton Scope v__VERSION__"
