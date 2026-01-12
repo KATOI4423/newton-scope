@@ -21,7 +21,7 @@ mod default {
     pub const FORMULA: &str = "z^3 - 1";
     pub const CANVAS_ZOOM_LEVEL: i32 = 0;
     pub const CANVAS_SIZE: u16 = 512;
-    pub const FRACTAL_MAX_ITER: u16 = 128;
+    pub const FRACTAL_MAX_ITER: u16 = 64;
 }
 
 /// 静的ディスパッチ用ラッパ
