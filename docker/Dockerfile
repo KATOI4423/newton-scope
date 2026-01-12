@@ -15,6 +15,7 @@ RUN apt-get upgrade -y && apt-get update -qq \
     libsoup-3.0-dev \
     libwebkit2gtk-4.1-dev \
     make \
+    mingw-w64 \
     pkg-config \
     sudo \
     tar \
@@ -43,6 +44,10 @@ WORKDIR /home/${USERNAME}
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
+
+RUN rustup target add x86_64-pc-windows-gnu \
+ && rustup target add x86_64-unknown-linux-gnu \
+;
 
 WORKDIR /work
 

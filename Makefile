@@ -27,7 +27,7 @@ image:
 		--build-arg USER_UID=$(shell id -u) \
 		--build-arg USER_GID=$(shell id -g) \
 		-t $(DOCKERIMAGE_NAME) $(DOCKER_DIR)
-		
+
 container-run:
 	$(DOCKER_RUN_BASECMD) -it $(DOCKERIMAGE_NAME) \
 		"bash -i"
@@ -37,9 +37,9 @@ container-run:
 # ================
 
 .PHONY: tauri
-tauri: tauri-linux
+tauri: tauri-linux tauri-windows
 
-.PHONY: tauri-linux tauri-linux-debug
+.PHONY: tauri-linux tauri-linux-debug tauri-windows
 tauri-linux: cargo-cache
 	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
 		"cd src-tauri && cargo build --release --target x86_64-unknown-linux-gnu"
@@ -47,6 +47,10 @@ tauri-linux: cargo-cache
 tauri-linux-debug: cargo-cache
 	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
 		"cd src-tauri && cargo build --target x86_64-unknown-linux-gnu"
+
+tauri-windows: cargo-cache
+	$(DOCKER_RUN_BASECMD) -t $(DOCKERIMAGE_NAME) \
+		"cd src-tauri && cargo build --release --target x86_64-pc-windows-gnu"
 
 cargo-cache: .cargo
 .cargo:
