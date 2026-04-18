@@ -6,7 +6,10 @@ use std::ops::{
     Add,
 };
 use std::collections::VecDeque;
-use crate::calculate::Func;
+use crate::calculate::{
+    ARITY,
+    Func,
+};
 
 const UNCALCULATED: u16 = u16::MAX;
 
@@ -61,8 +64,8 @@ pub struct CalcInfo
     pub size:   f64,
     pub center: Complex<f64>,
     pub range:  f64,
-    pub func:   Func,
-    pub deriv:  Func,
+    pub func:   Func<ARITY>,
+    pub deriv:  Func<ARITY>,
     pub coeff:  Complex<f64>
 }
 
@@ -78,7 +81,7 @@ impl CalcInfo
     pub fn new(
         x: u32, y: u32, w: u32, h: u32,
         max_itr: u16, size: f64, center: Complex<f64>, range: f64,
-        func: Func, deriv: Func,
+        func: Func<ARITY>, deriv: Func<ARITY>,
         coeff: Complex<f64>,
     ) -> Self {
         Self {
@@ -99,9 +102,9 @@ impl CalcInfo
 }
 
 #[inline]
-fn newton_method(z: Complex<f64>, a: Complex<f64>, func: &Func, deriv: &Func) -> Complex<f64>
+fn newton_method(z: Complex<f64>, a: Complex<f64>, func: &Func<ARITY>, deriv: &Func<ARITY>) -> Complex<f64>
 {
-    z - func(&[z]) / deriv(&[z]) * a
+    z - func([z]) / deriv([z]) * a
 }
 
 #[inline]
@@ -118,7 +121,7 @@ fn is_same(lhs: Complex<f64>, rhs: Complex<f64>, relative_error: f64) -> bool
     }
 }
 
-fn calc_escape_time(z: Complex<f64>, a: Complex<f64>, func: &Func, deriv: &Func, max_itr: u16) -> u16
+fn calc_escape_time(z: Complex<f64>, a: Complex<f64>, func: &Func<ARITY>, deriv: &Func<ARITY>, max_itr: u16) -> u16
 {
     let mut z1 = z;
     const EPSILON: f64 = 10e-10;

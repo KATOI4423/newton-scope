@@ -9,10 +9,10 @@ use png;
 use serde::{
     Serialize, Deserialize,
 };
-use std::sync::{
+use std::{sync::{
     Arc,
     Mutex,
-};
+}, usize};
 
 use crate::btm;
 
@@ -25,61 +25,46 @@ mod default {
 }
 
 /// 静的ディスパッチ用ラッパ
-struct FuncHolder<F>
+struct FuncHolder<F, const N: usize>
 where
-    F: Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static,
+    F: Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static,
 {
     func: Arc<F>,
 }
 
-impl<F> FuncHolder<F>
+impl<F, const N: usize> FuncHolder<F, N>
 where
-    F: Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static,
+    F: Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static,
 {
-    fn call(&self, args: &[Complex<f64>]) -> Complex<f64> {
+    fn call(&self, args: [Complex<f64>; N]) -> Complex<f64> {
         (self.func)(args)
     }
 }
 
 /// Formulacが生成する匿名関数を保持する
-pub type Func = Arc<dyn Fn(&[Complex<f64>]) -> Complex<f64> + Send + Sync + 'static>;
+pub type Func<const N: usize> = Arc<dyn Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static>;
+
+/// formulacのarity
+pub(crate) const ARITY: usize = 1;
 
 /// formulacの変数を保持する構造体
 struct Formulac
 {
-    vars: formulac::Variables,
-    usrs: formulac::UserDefinedTable,
-    f: Func,
-    df: Func,
+    f: Func<ARITY>,
+    df: Func<ARITY>,
 }
 
 impl Formulac {
     fn new() -> Self {
         Self {
-            vars: formulac::Variables::new(),
-            usrs: formulac::UserDefinedTable::new(),
-            f: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
-            df: Arc::new(|_: &[Complex<f64>]| Complex::ZERO),
+            f: Arc::new(|_: [Complex<f64>; ARITY]| Complex::ZERO),
+            df: Arc::new(|_: [Complex<f64>; ARITY]| Complex::ZERO),
         }
     }
 
-    #[allow(dead_code)]
-    fn set_vars(&mut self, vars: &[(&str, Complex<f64>)]) {
-        self.vars.insert(vars);
-    }
-
-    #[allow(dead_code)]
-    fn set_usrs(&mut self, function_list: &[(&str, formulac::UserDefinedFunction)]) {
-        for (key, func) in function_list {
-            self.usrs.register(*key, func.clone());
-        }
-    }
-
-    fn set_formula(&mut self, formula: &str) -> Result<(), String> {
-        let f = formulac::compile(formula, &["z"], &self.vars, &self.usrs)?;
-        let df = formulac::compile(
-            &format!("diff({}, z)", formula), &["z"], &self.vars, &self.usrs
-        )?;
+    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
+        let (f, df) = formulac::Builder::new(formula, ["z"])
+            .compile_with_derivative("z")?;
 
         let f_arc = Arc::new(f);
         let df_arc = Arc::new(df);
@@ -96,11 +81,11 @@ impl Formulac {
         Ok(())
     }
 
-    fn func(&self) -> &Func {
+    fn func(&self) -> &Func<ARITY> {
         &self.f
     }
 
-    fn deriv(&self) -> &Func {
+    fn deriv(&self) -> &Func<ARITY> {
         &self.df
     }
 }
@@ -218,7 +203,7 @@ impl Fractal {
         &mut self.formulac
     }
 
-    fn set_formula(&mut self, formula: &str) -> Result<(), String> {
+    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
         self.formulac_mut().set_formula(formula)?;
         self.formula = formula.to_string();
         Ok(())
@@ -256,7 +241,6 @@ impl Default for Fractal {
     }
 }
 
-
 static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
     Mutex::new(Fractal::default())
 });
@@ -288,12 +272,12 @@ pub fn get_available_syntax() -> Syntax {
         vec.iter().map(|str| str.to_string()).collect()
     };
 
-    let operators = from(formulac::parser::BinaryOperatorKind::names());
+    let operators = from(formulac::operators::OperatorKind::symbols().to_vec());
 
-    let mut constants = from(formulac::parser::constant::names());
+    let mut constants = from(formulac::constants::Constants::<f64>::symbols().to_vec());
     constants.push(formulac::lexer::IMAGINARY_UNIT.to_string());
 
-    let functions = from(formulac::parser::FunctionKind::names());
+    let functions = from(formulac::functions::FunctionKind::symbols().to_vec());
 
     Syntax {
         operators,
@@ -542,7 +526,8 @@ pub async fn import_from_png(path: String) -> Result<ImportResult, String> {
         let size = fractal.canvas().size().into();
         let max_iter = fractal.max_iter();
 
-        fractal.set_formula(&formula)?;
+        fractal.set_formula(&formula)
+            .map_err(|e| e.to_string())?;
         (formula, size, max_iter)
     };
 
