@@ -9,10 +9,10 @@ use png;
 use serde::{
     Serialize, Deserialize,
 };
-use std::{sync::{
+use std::sync::{
     Arc,
     Mutex,
-}, usize};
+};
 
 use crate::btm;
 
