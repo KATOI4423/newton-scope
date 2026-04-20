@@ -1,9 +1,16 @@
 use bitvec::prelude::*;
+use formulac::core::{
+    ComplexMath,
+    Real,
+};
 use num_complex::Complex;
-use num_traits::Zero;
 use rayon::prelude::*;
 use std::ops::{
-    Add,
+    Add, AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    RemAssign,
 };
 use std::collections::VecDeque;
 use crate::calculate::{
@@ -55,21 +62,27 @@ impl Add for Coordinates {
     }
 }
 
-pub struct CalcInfo
+pub struct CalcInfo<T>
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     pub start:  Coordinates,
     pub width:  u32,
     pub height: u32,
     pub max_itr:u16,
-    pub size:   f64,
-    pub center: Complex<f64>,
-    pub range:  f64,
-    pub func:   Func<ARITY>,
-    pub deriv:  Func<ARITY>,
-    pub coeff:  Complex<f64>
+    pub size:   T,
+    pub center: Complex<T>,
+    pub range:  T,
+    pub func:   Func<T, ARITY>,
+    pub deriv:  Func<T, ARITY>,
+    pub coeff:  Complex<T>
 }
 
-impl CalcInfo
+impl<T> CalcInfo<T>
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     /// ## Params
     ///  - x, y: top-left coordinates of rectangle
@@ -80,9 +93,9 @@ impl CalcInfo
     ///  - range: the range value of whole complex plane axis (Δx = Δy)
     pub fn new(
         x: u32, y: u32, w: u32, h: u32,
-        max_itr: u16, size: f64, center: Complex<f64>, range: f64,
-        func: Func<ARITY>, deriv: Func<ARITY>,
-        coeff: Complex<f64>,
+        max_itr: u16, size: T, center: Complex<T>, range: T,
+        func: Func<T, ARITY>, deriv: Func<T, ARITY>,
+        coeff: Complex<T>,
     ) -> Self {
         Self {
             start: Coordinates{ x: x as i64, y: y as i64 },
@@ -93,46 +106,56 @@ impl CalcInfo
     }
 
     #[inline]
-    fn get_complex(&self, x: i64, y: i64) -> Complex<f64> {
+    fn get_complex(&self, x: i64, y: i64) -> Complex<T> {
+        let size = self.size.clone();
+        let range = self.range.clone();
+        let center = self.center.clone();
+        let half = T::from_f64(0.5);
+        let x = T::from_f64((self.start.x + x) as f64);
+        let y = T::from_f64((self.start.y + y) as f64);
+
         Complex::new(
-            ((self.start.x + x) as f64 / self.size - 0.50) * self.range + self.center.re,
-            ((self.start.y + y) as f64 / self.size - 0.50) * self.range + self.center.im
+            (x / size.clone() - half.clone()) * range.clone() + center.re,
+            (y / size - half) * range + center.im
         )
     }
 }
 
 #[inline]
-fn newton_method(z: Complex<f64>, a: Complex<f64>, func: &Func<ARITY>, deriv: &Func<ARITY>) -> Complex<f64>
+fn newton_method<T>(z: Complex<T>, a: Complex<T>, func: &Func<T, ARITY>, deriv: &Func<T, ARITY>) -> Complex<T>
+where
+    T: Real + Send + Sync + 'static
 {
-    z - func([z]) / deriv([z]) * a
+    z.clone() - func([z.clone()]) / deriv([z]) * a
 }
 
 #[inline]
-fn is_same(lhs: Complex<f64>, rhs: Complex<f64>, relative_error: f64) -> bool
+fn is_same<T>(lhs: &Complex<T>, rhs: &Complex<T>, relative_error: T) -> bool
+where
+    T: Real + Send + Sync + 'static
 {
     let delta = lhs - rhs;
 
     if !(lhs.re.is_zero() && lhs.im.is_zero()) {
-        (delta / lhs).norm() < relative_error
+        (delta / lhs).abs().re < relative_error
     } else if !(rhs.re.is_zero() && rhs.im.is_zero()) {
-        (delta / rhs).norm() < relative_error
+        (delta / rhs).abs().re < relative_error
     } else {
         true
     }
 }
 
-fn calc_escape_time(z: Complex<f64>, a: Complex<f64>, func: &Func<ARITY>, deriv: &Func<ARITY>, max_itr: u16) -> u16
+fn calc_escape_time<T>(z: Complex<T>, a: &Complex<T>, func: &Func<T, ARITY>, deriv: &Func<T, ARITY>, max_itr: u16) -> u16
+where
+    T: Real + Send + Sync + 'static
 {
     let mut z1 = z;
-    const EPSILON: f64 = 10e-10;
+    let epsilon: T = T::from_f64(10e-5);
 
     for n in 0..max_itr {
-        let z2 = newton_method(z1, a, func, deriv);
+        let z2 = newton_method(z1.clone(), a.clone(), func, deriv);
 
-        if !z2.is_finite() {
-            return n;
-        }
-        if is_same(z1, z2, EPSILON) {
+        if is_same(&z1, &z2, epsilon.clone()) {
             return n;
         }
 
@@ -160,31 +183,35 @@ fn update_boundary(
     }
 }
 
-fn calc_edge(
+fn calc_edge<T>(
     buffer: &mut [u16],
     is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
-    info: &CalcInfo,
-) {
+    info: &CalcInfo<T>,
+)
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     let w: i64 = info.width as i64;
     let h = info.height as i64;
 
     // 上辺 (y=0)
     let idx_start = 0;
-    buffer[idx_start] = calc_escape_time(info.get_complex(0, 0), info.coeff, &info.func, &info.deriv, info.max_itr);
+    buffer[idx_start] = calc_escape_time(info.get_complex(0, 0), &info.coeff, &info.func, &info.deriv, info.max_itr);
     for x in 1..w {
         let idx = x as usize;
-        let val = calc_escape_time(info.get_complex(x, 0), info.coeff, &info.func, &info.deriv, info.max_itr);
+        let val = calc_escape_time(info.get_complex(x, 0), &info.coeff, &info.func, &info.deriv, info.max_itr);
         update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: 0 }, val);
     }
 
     // 下辺 (y=h-1)
     let y_bottom = h - 1;
     let offset_bottom = (y_bottom * w) as usize;
-    buffer[offset_bottom] = calc_escape_time(info.get_complex(0, y_bottom), info.coeff, &info.func, &info.deriv, info.max_itr);
+    buffer[offset_bottom] = calc_escape_time(info.get_complex(0, y_bottom), &info.coeff, &info.func, &info.deriv, info.max_itr);
     for x in 1..w {
         let idx = offset_bottom + x as usize;
-        let val = calc_escape_time(info.get_complex(x, y_bottom), info.coeff, &info.func, &info.deriv, info.max_itr);
+        let val = calc_escape_time(info.get_complex(x, y_bottom), &info.coeff, &info.func, &info.deriv, info.max_itr);
         update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: y_bottom }, val);
     }
 
@@ -193,18 +220,22 @@ fn calc_edge(
         for x in [0, w - 1] {
             let idx = ((y * w) + x) as usize;
             let idx_above = idx - w as usize ; // 上のマスと比較
-            let val = calc_escape_time(info.get_complex(x, y), info.coeff, &info.func, &info.deriv, info.max_itr);
+            let val = calc_escape_time(info.get_complex(x, y), &info.coeff, &info.func, &info.deriv, info.max_itr);
             update_boundary(buffer, is_pushed, boundaries, idx, idx_above, Coordinates { x, y }, val);
         }
     }
 }
 
-fn track_boundary(
+fn track_boundary<T>(
     buffer: &mut [u16],
     is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
-    info: &CalcInfo,
-) {
+    info: &CalcInfo<T>,
+)
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     let w = info.width as i64;
     let h = info.height as i64;
 
@@ -219,7 +250,7 @@ fn track_boundary(
 
             let idx = target.to_index(w);
             if buffer[idx] == UNCALCULATED {
-                buffer[idx] = calc_escape_time(info.get_complex(target.x, target.y), info.coeff, &info.func, &info.deriv, info.max_itr);
+                buffer[idx] = calc_escape_time(info.get_complex(target.x, target.y), &info.coeff, &info.func, &info.deriv, info.max_itr);
             }
             if (buffer[idx] != boundary_val) && !is_pushed[idx] {
                 is_pushed.set(idx, true);
@@ -248,7 +279,10 @@ fn fill_in_the_rest(buffer: &mut [u16], width: u32, height: u32)
     }
 }
 
-fn create_split_infos(info: &CalcInfo, task_num: usize, is_horizontal_split: bool) -> Vec<CalcInfo>
+fn create_split_infos<T>(info: &CalcInfo<T>, task_num: usize, is_horizontal_split: bool) -> Vec<CalcInfo<T>>
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     let x = info.start.x as u32;
     let y = info.start.y as u32;
@@ -264,8 +298,8 @@ fn create_split_infos(info: &CalcInfo, task_num: usize, is_horizontal_split: boo
                 dw
             };
             infos.push(CalcInfo::new(
-                x, y, w, info.height, info.max_itr, info.size, info.center, info.range,
-                info.func.clone(), info.deriv.clone(), info.coeff,
+                x, y, w, info.height, info.max_itr, info.size.clone(), info.center.clone(), info.range.clone(),
+                info.func.clone(), info.deriv.clone(), info.coeff.clone(),
             ));
         }
     } else {
@@ -278,8 +312,8 @@ fn create_split_infos(info: &CalcInfo, task_num: usize, is_horizontal_split: boo
                 dh
             };
             infos.push(CalcInfo::new(
-                x, y, info.width, h, info.max_itr, info.size, info.center, info.range,
-                info.func.clone(), info.deriv.clone(), info.coeff,
+                x, y, info.width, h, info.max_itr, info.size.clone(), info.center.clone(), info.range.clone(),
+                info.func.clone(), info.deriv.clone(), info.coeff.clone(),
             ));
         }
     }
@@ -287,7 +321,10 @@ fn create_split_infos(info: &CalcInfo, task_num: usize, is_horizontal_split: boo
     infos
 }
 
-fn calc_rect_parallel(info: &CalcInfo) -> Vec<u16>
+fn calc_rect_parallel<T>(info: &CalcInfo<T>) -> Vec<u16>
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     let w = info.width as usize;
     let h = info.height as usize;
@@ -304,7 +341,10 @@ fn calc_rect_parallel(info: &CalcInfo) -> Vec<u16>
     buffer
 }
 
-pub fn calc_rect(info: CalcInfo) -> Vec<u16>
+pub fn calc_rect<T>(info: CalcInfo<T>) -> Vec<u16>
+where
+    T: Real + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     const TASKS_RATE: usize = 8; // フラクタルは場所によって計算コストが大幅に異なるので、タスクを細かく分割するように補正をかける
     let n = (rayon::current_num_threads() * TASKS_RATE).max(1);

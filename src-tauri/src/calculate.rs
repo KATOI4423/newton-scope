@@ -1,14 +1,23 @@
 use formulac;
+use formulac::core::Real;
 use num_complex::Complex;
 use num_traits::{
-    Float,
-    FromPrimitive,
+    Zero,
 };
 use once_cell::sync::Lazy;
 use png;
 use serde::{
     Serialize, Deserialize,
 };
+use std::marker::PhantomData;
+use std::ops::{
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    RemAssign,
+};
+use std::str::FromStr;
 use std::sync::{
     Arc,
     Mutex,
@@ -25,72 +34,83 @@ mod default {
 }
 
 /// 静的ディスパッチ用ラッパ
-struct FuncHolder<F, const N: usize>
+struct FuncHolder<F, T: Real, const N: usize>
 where
-    F: Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static,
+    F: Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static,
 {
     func: Arc<F>,
+    _marker: PhantomData<T>,
 }
 
-impl<F, const N: usize> FuncHolder<F, N>
+impl<F, T: Real, const N: usize> FuncHolder<F, T, N>
 where
-    F: Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static,
+    F: Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static,
 {
-    fn call(&self, args: [Complex<f64>; N]) -> Complex<f64> {
+    fn call(&self, args: [Complex<T>; N]) -> Complex<T> {
         (self.func)(args)
     }
 }
 
 /// Formulacが生成する匿名関数を保持する
-pub type Func<const N: usize> = Arc<dyn Fn([Complex<f64>; N]) -> Complex<f64> + Send + Sync + 'static>;
+pub type Func<T, const N: usize> = Arc<dyn Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static>;
 
 /// formulacのarity
 pub(crate) const ARITY: usize = 1;
 
 /// formulacの変数を保持する構造体
-struct Formulac
+struct Formulac<T: Real>
+where
 {
-    f: Func<ARITY>,
-    df: Func<ARITY>,
+    f: Func<T, ARITY>,
+    df: Func<T, ARITY>,
 }
 
-impl Formulac {
+impl<T> Formulac<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     fn new() -> Self {
         Self {
-            f: Arc::new(|_: [Complex<f64>; ARITY]| Complex::ZERO),
-            df: Arc::new(|_: [Complex<f64>; ARITY]| Complex::ZERO),
+            f: Arc::new(|_: [Complex<T>; ARITY]| Complex::zero()),
+            df: Arc::new(|_: [Complex<T>; ARITY]| Complex::zero()),
         }
     }
 
-    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
-        let (f, df) = formulac::Builder::new(formula, ["z"])
+    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError>
+    {
+        let (f, df) = formulac::Builder::<T, ARITY>::new(formula, ["z"])
             .compile_with_derivative("z")?;
 
         let f_arc = Arc::new(f);
         let df_arc = Arc::new(df);
 
         self.f = Arc::new({
-            let f_holder = FuncHolder { func: f_arc.clone() };
+            let f_holder = FuncHolder { func: f_arc.clone(), _marker: PhantomData };
             move |args| f_holder.call(args)
         });
         self.df = Arc::new({
-            let df_holder = FuncHolder { func: df_arc.clone() };
+            let df_holder = FuncHolder { func: df_arc.clone(), _marker: PhantomData };
             move |args| df_holder.call(args)
         });
 
         Ok(())
     }
 
-    fn func(&self) -> &Func<ARITY> {
+    fn func(&self) -> &Func<T, ARITY> {
         &self.f
     }
 
-    fn deriv(&self) -> &Func<ARITY> {
+    fn deriv(&self) -> &Func<T, ARITY> {
         &self.df
     }
 }
 
-impl Default for Formulac {
+impl<T: Real> Default for Formulac<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     fn default() -> Self {
         let mut default = Self::new();
         let _ = default.set_formula(default::FORMULA); // 失敗しないので
@@ -100,15 +120,18 @@ impl Default for Formulac {
 
 /// 複素数平面の情報を保持する構造体
 #[derive(Serialize, Deserialize)]
-struct Canvas<T>
-    where T: Float + FromPrimitive,
+struct Canvas<T: Real>
 {
     center: num_complex::Complex<T>,
     zoom_level:  i32,
     size: u16,
 }
 
-impl<T: Float + FromPrimitive> Canvas<T> {
+impl<T: Real> Canvas<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     fn set_center(&mut self, re: T, im: T) {
         self.center.re = re;
         self.center.im = im;
@@ -134,15 +157,15 @@ impl<T: Float + FromPrimitive> Canvas<T> {
 
         // 座標中心は0.5なので、マウスの座標の偏差によって補正する
         let delta = Complex::new(
-            d_width * T::from_f64(mouse_x_ratio - 0.5).unwrap(),
-            d_width * T::from_f64(0.5 - mouse_y_ratio).unwrap()
+            d_width.clone() * T::from_f64(mouse_x_ratio - 0.5),
+            d_width * T::from_f64(0.5 - mouse_y_ratio)
         );
 
-        self.center = self.center + delta;
+        self.center += delta;
     }
 
-    fn center(&self) -> num_complex::Complex<T> {
-        self.center
+    fn center(&self) -> &num_complex::Complex<T> {
+        &self.center
     }
 
     fn size(&self) -> u16 {
@@ -162,16 +185,14 @@ impl<T: Float + FromPrimitive> Canvas<T> {
         // 2.0 * 2.0^(-zoom_level * zoom_step) = 2.0^(-zoom_level * zoom_step + 1)
         //  └> [-1.0, 1.0].width() = 2.0
         T::from_f64(2.0f64.powf(-self.zoom_level as f64 * Self::zoom_step() + 1.0))
-            .unwrap_or_else(|| T::nan())
     }
 
     fn scale(&self) -> T {
         T::from_f64(2.0f64.powf(self.zoom_level as f64 * Self::zoom_step()))
-            .unwrap_or_else(|| T::nan())
     }
 }
 
-impl<T: Float + FromPrimitive> Default for Canvas<T>
+impl<T: Real> Default for Canvas<T>
 {
     fn default() -> Self {
         Self {
@@ -185,21 +206,29 @@ impl<T: Float + FromPrimitive> Default for Canvas<T>
 
 /// フラクタル計算に使用する情報を保持する構造体
 #[derive(Serialize, Deserialize)]
-struct Fractal {
+struct Fractal<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     #[serde(skip)] // 数式文字列の情報のみで良いため、Formulacはserializeしない
-    formulac:   Formulac,
+    formulac:   Formulac<T>,
     formula:    String,
-    canvas:     Canvas<f64>,
+    canvas:     Canvas<T>,
     max_iter:   u16,
 }
 
 
-impl Fractal {
-    fn formulac(&self) -> &Formulac {
+impl<T> Fractal<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
+    fn formulac(&self) -> &Formulac<T> {
         &self.formulac
     }
 
-    fn formulac_mut(&mut self) ->&mut Formulac {
+    fn formulac_mut(&mut self) ->&mut Formulac<T> {
         &mut self.formulac
     }
 
@@ -213,11 +242,11 @@ impl Fractal {
         &self.formula
     }
 
-    fn canvas(&self) -> &Canvas<f64> {
+    fn canvas(&self) -> &Canvas<T> {
         &self.canvas
     }
 
-    fn canvas_mut(&mut self) -> &mut Canvas<f64> {
+    fn canvas_mut(&mut self) -> &mut Canvas<T> {
         &mut self.canvas
     }
 
@@ -230,7 +259,11 @@ impl Fractal {
     }
 }
 
-impl Default for Fractal {
+impl<T> Default for Fractal<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
     fn default() -> Self {
         Self {
             formulac:   Formulac::default(),
@@ -241,7 +274,7 @@ impl Default for Fractal {
     }
 }
 
-static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
+static FRACTAL: Lazy<Mutex<Fractal<f64>>> = Lazy::new(|| {
     Mutex::new(Fractal::default())
 });
 
@@ -298,8 +331,8 @@ fn format_with_decimal(x: f64) -> String {
 
 #[tauri::command]
 pub fn get_center_str() -> String {
-    let center = FRACTAL.lock().unwrap()
-        .canvas().center();
+    let fractal = FRACTAL.lock().unwrap();
+    let center = fractal.canvas().center();
     format!("({re}, {im})",
         re = format_with_decimal(center.re),
         im = format_with_decimal(center.im)
@@ -369,7 +402,7 @@ pub fn set_size(size: u16) {
 pub fn move_view(dx: f64, dy: f64) {
     let mut fractal = FRACTAL.lock().unwrap();
     let width = fractal.canvas().width();
-    let center = fractal.canvas().center();
+    let center = fractal.canvas().center().clone();
 
     fractal.canvas_mut().set_center(
         center.re - dx * width,
@@ -405,7 +438,7 @@ pub async fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u16>, Str
                 x, y, w, h,
                 fractal.max_iter(),
                 fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
-                fractal.canvas().center(),
+                fractal.canvas().center().clone(),
                 fractal.canvas().width(),
                 fractal.formulac().func().clone(),
                 fractal.formulac().deriv().clone(),
