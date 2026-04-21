@@ -6,9 +6,11 @@ use num_traits::{
 };
 use once_cell::sync::Lazy;
 use png;
+use png::text_metadata::TEXtChunk;
 use serde::{
     Serialize, Deserialize,
 };
+use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 use std::ops::{
     AddAssign,
@@ -58,14 +60,26 @@ pub type Func<T, const N: usize> = Arc<dyn Fn([Complex<T>; N]) -> Complex<T> + S
 pub(crate) const ARITY: usize = 1;
 
 /// formulacの変数を保持する構造体
-struct Formulac<T: Real>
+#[derive(Clone)]
+struct FormulacInner<T: Real>
 where
 {
     f: Func<T, ARITY>,
     df: Func<T, ARITY>,
 }
 
-impl<T> Formulac<T>
+impl<T> std::fmt::Debug for FormulacInner<T>
+where
+    T: Real,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FormulacInner")
+            .field("Generics", &std::any::type_name::<T>())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T> FormulacInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
@@ -106,7 +120,7 @@ where
     }
 }
 
-impl<T: Real> Default for Formulac<T>
+impl<T: Real> Default for FormulacInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
@@ -118,8 +132,20 @@ where
     }
 }
 
+/// FormulacInnerのジェネリクス切り替え用enum
+#[derive(Debug, Clone)]
+enum Formulac {
+    F64(FormulacInner<f64>),
+}
+
+impl Default for Formulac {
+    fn default() -> Self {
+        Self::F64(FormulacInner::default())
+    }
+}
+
 /// 複素数平面の情報を保持する構造体
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Canvas<T: Real>
 {
     center: num_complex::Complex<T>,
@@ -205,35 +231,50 @@ impl<T: Real> Default for Canvas<T>
 
 
 /// フラクタル計算に使用する情報を保持する構造体
-#[derive(Serialize, Deserialize)]
-struct Fractal<T>
+#[derive(Clone, Serialize, Deserialize)]
+struct FractalInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
     #[serde(skip)] // 数式文字列の情報のみで良いため、Formulacはserializeしない
-    formulac:   Formulac<T>,
+    formulac:   Formulac,
     formula:    String,
     canvas:     Canvas<T>,
     max_iter:   u16,
 }
 
-
-impl<T> Fractal<T>
+impl<T> std::fmt::Debug for FractalInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
 {
-    fn formulac(&self) -> &Formulac<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FractalInner")
+            .field("formula", &self.formula)
+            .field("canvas", &self.canvas)
+            .field("max_iter", &self.max_iter)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T> FractalInner<T>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
+    fn formulac(&self) -> &Formulac {
         &self.formulac
     }
 
-    fn formulac_mut(&mut self) ->&mut Formulac<T> {
+    fn formulac_mut(&mut self) ->&mut Formulac {
         &mut self.formulac
     }
 
     fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
-        self.formulac_mut().set_formula(formula)?;
+        match self.formulac_mut() {
+            Formulac::F64(f) => f.set_formula(formula)?,
+        }
         self.formula = formula.to_string();
         Ok(())
     }
@@ -259,7 +300,7 @@ where
     }
 }
 
-impl<T> Default for Fractal<T>
+impl<T> Default for FractalInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
@@ -274,7 +315,26 @@ where
     }
 }
 
-static FRACTAL: Lazy<Mutex<Fractal<f64>>> = Lazy::new(|| {
+#[derive(Debug, Clone)]
+enum Fractal {
+    F64(FractalInner<f64>),
+}
+
+impl Default for Fractal {
+    fn default() -> Self {
+        Self::F64(FractalInner::default())
+    }
+}
+
+impl Fractal {
+    fn to_index(&self) -> usize {
+        match self {
+            Self::F64(_) => 0,
+        }
+    }
+}
+
+static FRACTAL: Lazy<Mutex<Fractal>> = Lazy::new(|| {
     Mutex::new(Fractal::default())
 });
 
@@ -320,7 +380,10 @@ pub fn get_available_syntax() -> Syntax {
 }
 
 /// 指数表記の際に、小数点がない場合は ".0" を追加する
-fn format_with_decimal(x: f64) -> String {
+fn format_with_decimal<T>(x: T) -> String
+where
+    T: Real + std::fmt::LowerExp,
+{
     let s = format!("{:e}", x);
     if s.contains('.') {
         s
@@ -329,10 +392,12 @@ fn format_with_decimal(x: f64) -> String {
     }
 }
 
-#[tauri::command]
-pub fn get_center_str() -> String {
-    let fractal = FRACTAL.lock().unwrap();
-    let center = fractal.canvas().center();
+// Tの差を吸収するために別関数にする
+#[inline]
+fn get_center_str_inner<T>(center: Complex<T>) -> String
+where
+    T: Real + std::fmt::LowerExp,
+{
     format!("({re}, {im})",
         re = format_with_decimal(center.re),
         im = format_with_decimal(center.im)
@@ -340,8 +405,17 @@ pub fn get_center_str() -> String {
 }
 
 #[tauri::command]
+pub fn get_center_str() -> String {
+    match &*FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => get_center_str_inner(f.canvas().center().clone()),
+    }
+}
+
+#[tauri::command]
 pub fn get_scale_str() -> String {
-    format!("{}", format_with_decimal(FRACTAL.lock().unwrap().canvas().scale()))
+    match &*FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => format_with_decimal(f.canvas().scale().clone()),
+    }
 }
 
 #[tauri::command]
@@ -351,8 +425,9 @@ pub fn get_default_size() -> i32 {
 
 #[tauri::command]
 pub fn get_size() -> i32 {
-    FRACTAL.lock().unwrap()
-        .canvas().size().into()
+    match &*FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => f.canvas().size().into()
+    }
 }
 
 #[tauri::command]
@@ -368,8 +443,10 @@ pub fn get_default_max_iter() -> i32 {
 #[tauri::command]
 pub async fn set_formula(formula: String) -> Result<(), String> {
     let result = tauri::async_runtime::spawn_blocking(move || -> String {
-        let mut fractal = FRACTAL.lock().unwrap();
-        match fractal.set_formula(&formula) {
+        let result = match &mut *FRACTAL.lock().unwrap() {
+            Fractal::F64(f) => f.set_formula(&formula),
+        };
+        match result {
             Ok(_) => "".to_string(),
             Err(e) => e.to_string(),
         }
@@ -388,26 +465,37 @@ pub async fn set_formula(formula: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn set_max_iter(max_iter: u16) {
-    FRACTAL.lock().unwrap().set_max_iter(max_iter);
+    match &mut *FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => f.set_max_iter(max_iter),
+    }
 }
 
 #[tauri::command]
 pub fn set_size(size: u16) {
-    FRACTAL.lock().unwrap()
-        .canvas_mut().set_size(size);
+    match &mut *FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => f.canvas_mut().set_size(size),
+    }
+}
+
+// Tの差を吸収するために別関数にする
+fn move_view_inner<T>(f: &mut FractalInner<T>, dx: f64, dy: f64)
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
+    let width = f.canvas().width();
+    let center = f.canvas().center().clone();
+    let re = center.re - T::from_f64(dx) * width.clone();
+    let im = center.im + T::from_f64(dy) * width;
+    f.canvas_mut().set_center(re, im);
 }
 
 /// 中心座標を移動させる
 #[tauri::command]
 pub fn move_view(dx: f64, dy: f64) {
-    let mut fractal = FRACTAL.lock().unwrap();
-    let width = fractal.canvas().width();
-    let center = fractal.canvas().center().clone();
-
-    fractal.canvas_mut().set_center(
-        center.re - dx * width,
-        center.im + dy * width
-    );
+    match &mut *FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => move_view_inner(f, dx, dy),
+    }
 }
 
 /// # 縮尺を変更する
@@ -417,9 +505,26 @@ pub fn move_view(dx: f64, dy: f64) {
 /// - エラー: "<エラーメッセージ>"
 #[tauri::command]
 pub fn zoom_view(level: i32, x: f64, y: f64) {
-    let mut fractal = FRACTAL.lock().unwrap();
+    match &mut *FRACTAL.lock().unwrap() {
+        Fractal::F64(f) => f.canvas_mut().zoom_around_point(level, x, y),
+    }
+}
 
-    fractal.canvas_mut().zoom_around_point(level, x, y);
+fn render_tile_inner<T>(fr: &FractalInner<T>, fo: &FormulacInner<T>, x: u32, y: u32, w: u32, h: u32) -> Vec<u16>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+{
+    btm::calc_rect(btm::CalcInfo::new(
+            x, y, w, h,
+            fr.max_iter(),
+            T::from_f64(fr.canvas().size() as f64),
+            fr.canvas().center().clone(),
+            fr.canvas().width(),
+            fo.func().clone(),
+            fo.deriv().clone(),
+            Complex::from(T::one()),
+    ))
 }
 
 /// # 指定された矩形領域のデータのみを生成して返す
@@ -432,21 +537,12 @@ pub fn zoom_view(level: i32, x: f64, y: f64) {
 #[tauri::command]
 pub async fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u16>, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let info = {
-            let fractal = FRACTAL.lock().unwrap();
-            btm::CalcInfo::new(
-                x, y, w, h,
-                fractal.max_iter(),
-                fractal.canvas().size() as f64, // キャスト回数削減のため、最初からf64で取る
-                fractal.canvas().center().clone(),
-                fractal.canvas().width(),
-                fractal.formulac().func().clone(),
-                fractal.formulac().deriv().clone(),
-                Complex::ONE, // TODO: UIから変更できるようにする？
-            )
-        };
-
-        btm::calc_rect(info)
+        match &*FRACTAL.lock().unwrap() {
+            Fractal::F64(fr) => {
+                let Formulac::F64(fo) = fr.formulac();
+                render_tile_inner(fr, fo, x, y, w, h)
+            }
+        }
     }).await;
 
     match result {
@@ -477,17 +573,28 @@ fn apply_color_map(buffer: Vec<u16>, max_iter: u16) -> Vec<u8> {
         .collect()
 }
 
+fn save_png_get_data<T>(f: &FractalInner<T>) -> Result<(String, u32, u16), String>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign
+        + Serialize,
+{
+    let size = f.canvas().size() as u32;
+    let max_iter = f.max_iter();
+    let metadata = serde_json::to_string(f)
+        .map_err(|e| format!("Inner Error: JSON serialization failed: {}", e))?;
+    Ok((metadata, size, max_iter))
+}
+
 #[tauri::command]
 pub async fn save_png(path: String) -> Result<(), String> {
     let (metadata, size, max_iter) = {
-        let fractal = FRACTAL.lock()
-            .map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))?;
-        let size = fractal.canvas().size();
-        let max_iter = fractal.max_iter();
-        let metadata = serde_json::to_string(&*fractal)
-            .map_err(|e| format!("Inner Error: JSON serialization failed: {}", e))?;
-        (metadata, size as u32, max_iter)
+        match &*FRACTAL.lock().map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))? {
+            Fractal::F64(f) => save_png_get_data(f)?,
+        }
     };
+    let enum_index = FRACTAL.lock().map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))?
+        .to_index();
 
     let calc_data = {
         let mut raw_data = render_tile(0, 0, size, size).await?;
@@ -516,6 +623,7 @@ pub async fn save_png(path: String) -> Result<(), String> {
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let _ = encoder.add_text_chunk("FractalParameters".to_string(), metadata);
+    let _ = encoder.add_text_chunk("Generics".to_string(), format!("{}", enum_index));
 
     let mut png_writer = encoder.write_header().map_err(|e| e.to_string())?;
     png_writer.write_image_data(&rgba_data).map_err(|e| e.to_string())?;
@@ -534,6 +642,23 @@ pub struct ImportResult {
     scale_str:  String,
 }
 
+fn import_from_png_build_fractal_inner<T>(metadata_text: &TEXtChunk) -> Result<FractalInner<T>, String>
+where
+    T: Real + FromStr + Send + Sync + 'static
+        + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign
+        + DeserializeOwned,
+{
+    let mut f: FractalInner<T> = serde_json::from_str(&metadata_text.text)
+        .map_err(|e| e.to_string())?;
+
+    let formula = f.formula().to_string();
+    f.set_formula(&formula)
+        .map_err(|e| e.to_string())?;
+
+    Ok(f)
+}
+
+
 #[tauri::command]
 pub async fn import_from_png(path: String) -> Result<ImportResult, String> {
     let file = std::fs::File::open(&path)
@@ -547,21 +672,28 @@ pub async fn import_from_png(path: String) -> Result<ImportResult, String> {
     let metadata_text = reader.info().uncompressed_latin1_text.iter()
         .find(|chunk| chunk.keyword == "FractalParameters")
         .ok_or(format!("Not Found Fractal Parameters in {}.", &path))?;
-
+    let enum_index = usize::from_str(&reader.info().uncompressed_latin1_text.iter()
+        .find(|chunk| chunk.keyword == "Generics")
+        .unwrap_or(&&TEXtChunk { keyword: "Generics".into(), text: "0".into() }) /* 存在しない場合は f64 とする */
+        .text
+    ).map_err(|e| e.to_string())?;
 
     let (formula, size, max_iter) = {
         // center_strとscale_strの取得時にFRACTALをlockするので、デッドロックしないように、
         // FRACTALの設定時に応答値を同時に取得する
-        let mut fractal = FRACTAL.lock().map_err(|e| e.to_string())?;
-        *fractal = serde_json::from_str(&metadata_text.text).map_err(|e| e.to_string())?;
+        let mut f = FRACTAL.lock().map_err(|e| e.to_string())?;
+        match enum_index {
+            0 => {
+                let fo = import_from_png_build_fractal_inner::<f64>(metadata_text)?;
+                let formula = fo.formula().to_string();
+                let size = fo.canvas().size().into();
+                let max_iter = fo.max_iter();
 
-        let formula = fractal.formula().to_string();
-        let size = fractal.canvas().size().into();
-        let max_iter = fractal.max_iter();
-
-        fractal.set_formula(&formula)
-            .map_err(|e| e.to_string())?;
-        (formula, size, max_iter)
+                *f = Fractal::F64(fo);
+                (formula, size, max_iter)
+            },
+            _ => return Err(format!("Invalid Generics Parameters ({}) in {}.", enum_index, &path)),
+        }
     };
 
     Ok(ImportResult {
