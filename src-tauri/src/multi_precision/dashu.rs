@@ -1253,7 +1253,8 @@ mod tests_lower_exp {
     fn negative_pi() {
         let v = -MD::<113>::pi();
         let s = fmt_prec(v, 10);
-        assert!(s.starts_with("-3.1415926535"), "negative pi: {}", s);
+        // 3.14159265358.. -> 3.1415926536
+        assert!(s.starts_with("-3.1415926536"), "negative pi: {}", s);
     }
 
     // ── ラウンドトリップ ───────────────────────────────────────
