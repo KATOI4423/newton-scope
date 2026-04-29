@@ -221,6 +221,10 @@ impl <const N: usize> MD<N> {
 impl <const N: usize, const B: u64> From<FBig<HalfAway, B>> for MD<N> {
     fn from(value: FBig<HalfAway, B>) -> Self {
         let fbig2 = value.with_rounding::<HalfAway>().with_base::<2>().value();
+        if fbig2.repr().is_infinite() {
+            // inf, nan は 四則演算を適応できないので、正規化せずにそのまま返す
+            return Self { value: fbig2 };
+        }
         let normalized = Self::ctx().add(fbig2.repr(), FBig::<HalfAway>::ZERO.repr()).value();
         Self { value: normalized }
     }
