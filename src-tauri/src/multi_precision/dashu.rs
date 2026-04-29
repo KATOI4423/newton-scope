@@ -60,6 +60,8 @@ static PI_CACHE: OnceLock<RwLock<HashMap<usize, FBig<HalfAway, 2>>>> = OnceLock:
 static LN2_CACHE: OnceLock<RwLock<HashMap<usize, FBig<HalfAway, 2>>>> = OnceLock::new();
 // Ln(10) のキャッシュをグローバルに保持 (N: 精度 -> Fbig: 計算結果)
 static LN10_CACHE: OnceLock<RwLock<HashMap<usize, FBig<HalfAway, 2>>>> = OnceLock::new();
+// sqrt(2) のキャッシュをグローバルに保持 (N: 精度 -> Fbig: 計算結果)
+static SQRT2_CACHE: OnceLock<RwLock<HashMap<usize, FBig<HalfAway, 2>>>> = OnceLock::new();
 
 /// chudnovsky のアルゴリズムにより pi を計算する
 impl <const N: usize> MD<N> {
@@ -639,7 +641,18 @@ impl <const N: usize> Real for MD<N> {
         val
     }
     fn sqrt_2() -> Self {
-        Self::from(2).sqrt()
+        let cache = SQRT2_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+
+        if let Some(val) = cache.read().unwrap().get(&N) {
+            return val.clone().into();
+        }
+
+        let val = Self::from(2).sqrt();
+
+        let mut map = cache.write().unwrap();
+        map.insert(N, val.value.clone());
+
+        val
     }
     fn tau() -> Self {
         Self::pi() * Self::from(2)
