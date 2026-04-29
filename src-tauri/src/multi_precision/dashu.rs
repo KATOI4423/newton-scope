@@ -305,7 +305,7 @@ impl <const N: usize> LowerExp for MD<N> {
         }
 
         let dbig = v.to_decimal().value()
-            .with_precision(prec).value();
+            .with_precision(prec + 1).value(); // with_precision は 全桁合わせた桁数. fmt の precision は小数点以下の桁数.
         let repr = dbig.repr();
         let exp10 = repr.exponent();
 
