@@ -236,16 +236,18 @@ async function zoomProcess() {
     // バッファをリセット
     state.pendingZoom = { level: 0, x: 0, y: 0 };
 
-    try {
-        const size = Number(elements.presetSize.value);
-        await invoke("zoom_view", { level, x, y });
-        await updateInfoStr();
-        await updateTile(size, size);
-    } finally {
-        state.isRendering = false;
-        // 処理中に入力があれば、次のループにて処理する
-        requestAnimationFrame(interactionLoop);
-    }
+    await withSpinner(async () => {
+        try {
+            const size = Number(elements.presetSize.value);
+            await invoke("zoom_view", { level, x, y });
+            await updateInfoStr();
+            await updateTile(size, size);
+        } finally {
+            state.isRendering = false;
+            // 処理中に入力があれば、次のループにて処理する
+            requestAnimationFrame(interactionLoop);
+        }
+    });
 }
 
 /** move処理 */
@@ -274,21 +276,23 @@ async function moveProcess() {
         return;
     }
 
-    try {
-        const normalizedDx = pixelDx / texSize;
-        const normalizedDy = pixelDy / texSize;
+    await withSpinner(async () => {
+        try {
+            const normalizedDx = pixelDx / texSize;
+            const normalizedDy = pixelDy / texSize;
 
-        await invoke("move_view", {
-            dx: normalizedDx,
-            dy: normalizedDy
-        });
-        await updateInfoStr();
-        await updateTile(pixelDx, pixelDy);
-    } finally {
-        state.isRendering = false;
-        // 処理中に入力があれば、次のループにて処理する
-        requestAnimationFrame(interactionLoop);
-    }
+            await invoke("move_view", {
+                dx: normalizedDx,
+                dy: normalizedDy
+            });
+            await updateInfoStr();
+            await updateTile(pixelDx, pixelDy);
+        } finally {
+            state.isRendering = false;
+            // 処理中に入力があれば、次のループにて処理する
+            requestAnimationFrame(interactionLoop);
+        }
+    });
 }
 
 /**

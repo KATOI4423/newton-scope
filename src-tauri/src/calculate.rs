@@ -26,6 +26,9 @@ use std::sync::{
 };
 
 use crate::btm;
+use crate::multi_precision::{
+    MD,
+};
 
 /// 初期値
 mod default {
@@ -136,6 +139,7 @@ where
 #[derive(Debug, Clone)]
 enum Formulac {
     F64(FormulacInner<f64>),
+    F128(FormulacInner<MD<128>>),
 }
 
 impl Default for Formulac {
@@ -274,6 +278,7 @@ where
     fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
         match self.formulac_mut() {
             Formulac::F64(f) => f.set_formula(formula)?,
+            Formulac::F128(f) => f.set_formula(formula)?,
         }
         self.formula = formula.to_string();
         Ok(())
@@ -318,6 +323,7 @@ where
 #[derive(Debug, Clone)]
 enum Fractal {
     F64(FractalInner<f64>),
+    F128(FractalInner<MD<128>>),
 }
 
 impl Default for Fractal {
@@ -330,6 +336,66 @@ impl Fractal {
     fn to_index(&self) -> usize {
         match self {
             Self::F64(_) => 0,
+            Self::F128(_) => 1,
+        }
+    }
+
+    /// zoom levelの閾値を返す
+    ///
+    /// # Returns
+    ///  - std::ops::Range
+    ///    - min: 計算精度を1段階粗くする閾値
+    ///    - max: 計算精度を1段階細かくする閾値
+    fn zoom_threshold(&self) -> std::ops::Range<i64> {
+        match self {
+            Self::F64(_) => std::ops::Range { start: 0, end: 350 },
+            Self::F128(_) => std::ops::Range { start: 350, end: 700 },
+        }
+    }
+
+    // 浮動小数点のビット幅を1段階下げる
+    fn down(&mut self) {
+        match self {
+            Self::F64(_) => (), // 最低値
+            Self::F128(f) => {
+                let max_iter = f.max_iter();
+
+                let center = f.canvas().center();
+                let center = Complex::new(center.re.to_f64(), center.im.to_f64());
+                let zoom_level = f.canvas().zoom_level;
+                let size = f.canvas().size();
+                let canvas = Canvas { center, zoom_level, size };
+
+                let formula = f.formula.clone();
+                let mut formulac = FormulacInner::new();
+                formulac.set_formula(&formula).unwrap(); // 一回作成に成功しているので、失敗しない
+                let formulac = Formulac::F64(formulac);
+
+                *self = Self::F64(FractalInner { formulac, formula, canvas, max_iter });
+            }
+        }
+    }
+
+    // 浮動小数点のビット幅を1段階上げる
+    fn up(&mut self) {
+        match self {
+            Self::F64(f) => {
+                let max_iter = f.max_iter();
+
+                let center = f.canvas().center();
+                let center = Complex::new(MD::from_f64(center.re), MD::from_f64(center.im));
+                let zoom_level = f.canvas().zoom_level;
+                let size = f.canvas().size();
+                let canvas = Canvas { center, zoom_level, size };
+
+                let formula = f.formula.clone();
+                let mut formulac = FormulacInner::new();
+                formulac.set_formula(&formula).unwrap(); // 一回作成に成功しているので、失敗しない
+                let formulac = Formulac::F128(formulac);
+
+                *self = Self::F128(FractalInner { formulac, formula, canvas, max_iter })
+            },
+            Self::F128(_) => (), // 最大値
         }
     }
 }
@@ -408,6 +474,7 @@ where
 pub fn get_center_str() -> String {
     match &*FRACTAL.lock().unwrap() {
         Fractal::F64(f) => get_center_str_inner(f.canvas().center().clone()),
+        Fractal::F128(f) => get_center_str_inner(f.canvas().center().clone()),
     }
 }
 
@@ -415,6 +482,7 @@ pub fn get_center_str() -> String {
 pub fn get_scale_str() -> String {
     match &*FRACTAL.lock().unwrap() {
         Fractal::F64(f) => format_with_decimal(f.canvas().scale().clone()),
+        Fractal::F128(f) => format_with_decimal(f.canvas().scale().clone()),
     }
 }
 
@@ -426,7 +494,8 @@ pub fn get_default_size() -> i32 {
 #[tauri::command]
 pub fn get_size() -> i32 {
     match &*FRACTAL.lock().unwrap() {
-        Fractal::F64(f) => f.canvas().size().into()
+        Fractal::F64(f) => f.canvas().size().into(),
+        Fractal::F128(f) => f.canvas().size().into(),
     }
 }
 
@@ -445,6 +514,7 @@ pub async fn set_formula(formula: String) -> Result<(), String> {
     let result = tauri::async_runtime::spawn_blocking(move || -> String {
         let result = match &mut *FRACTAL.lock().unwrap() {
             Fractal::F64(f) => f.set_formula(&formula),
+            Fractal::F128(f) => f.set_formula(&formula),
         };
         match result {
             Ok(_) => "".to_string(),
@@ -467,6 +537,7 @@ pub async fn set_formula(formula: String) -> Result<(), String> {
 pub fn set_max_iter(max_iter: u16) {
     match &mut *FRACTAL.lock().unwrap() {
         Fractal::F64(f) => f.set_max_iter(max_iter),
+        Fractal::F128(f) => f.set_max_iter(max_iter),
     }
 }
 
@@ -474,6 +545,7 @@ pub fn set_max_iter(max_iter: u16) {
 pub fn set_size(size: u16) {
     match &mut *FRACTAL.lock().unwrap() {
         Fractal::F64(f) => f.canvas_mut().set_size(size),
+        Fractal::F128(f) => f.canvas_mut().set_size(size),
     }
 }
 
@@ -492,22 +564,51 @@ where
 
 /// 中心座標を移動させる
 #[tauri::command]
-pub fn move_view(dx: f64, dy: f64) {
-    match &mut *FRACTAL.lock().unwrap() {
-        Fractal::F64(f) => move_view_inner(f, dx, dy),
-    }
+pub async fn move_view(dx: f64, dy: f64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        match &mut *FRACTAL.lock().unwrap() {
+            Fractal::F64(f) => move_view_inner(f, dx, dy),
+            Fractal::F128(f) => move_view_inner(f, dx, dy),
+        }
+    }).await;
 }
 
 /// # 縮尺を変更する
-///
-/// # Returns:
-/// - 成功: "OK"
-/// - エラー: "<エラーメッセージ>"
 #[tauri::command]
-pub fn zoom_view(level: i32, x: f64, y: f64) {
-    match &mut *FRACTAL.lock().unwrap() {
-        Fractal::F64(f) => f.canvas_mut().zoom_around_point(level, x, y),
-    }
+pub async fn zoom_view(level: i32, x: f64, y: f64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        let mut fractal = FRACTAL.lock().unwrap();
+        let std::ops::Range { start: zoom_min, end: zoom_max } = fractal.zoom_threshold();
+
+        enum Precision {
+            Up, Down, AsIs,
+        }
+        let mut is_precision = Precision::AsIs;
+
+        match &mut *fractal {
+            Fractal::F64(f) => {
+                f.canvas_mut().zoom_around_point(level, x, y);
+                if f.canvas().zoom_level.abs() as i64 > zoom_max {
+                    is_precision = Precision::Up;
+                }
+            },
+            Fractal::F128(f) => {
+                f.canvas_mut().zoom_around_point(level, x, y);
+                let zoom_level = f.canvas().zoom_level.abs() as i64;
+                if zoom_level > zoom_max {
+                    // TODO: F256 の実装
+                } else if zoom_level < zoom_min {
+                    is_precision = Precision::Down;
+                }
+            },
+        }
+
+        match is_precision {
+            Precision::AsIs => (),
+            Precision::Up => fractal.up(),
+            Precision::Down => fractal.down(),
+        }
+    }).await;
 }
 
 fn render_tile_inner<T>(fr: &FractalInner<T>, fo: &FormulacInner<T>, x: u32, y: u32, w: u32, h: u32) -> Vec<u16>
@@ -539,7 +640,11 @@ pub async fn render_tile(x: u32, y: u32, w: u32, h: u32) -> Result<Vec<u16>, Str
     let result = tauri::async_runtime::spawn_blocking(move || {
         match &*FRACTAL.lock().unwrap() {
             Fractal::F64(fr) => {
-                let Formulac::F64(fo) = fr.formulac();
+                let Formulac::F64(fo) = fr.formulac() else { unreachable!() };
+                render_tile_inner(fr, fo, x, y, w, h)
+            },
+            Fractal::F128(fr) => {
+                let Formulac::F128(fo) = fr.formulac() else { unreachable!() };
                 render_tile_inner(fr, fo, x, y, w, h)
             }
         }
@@ -591,6 +696,7 @@ pub async fn save_png(path: String) -> Result<(), String> {
     let (metadata, size, max_iter) = {
         match &*FRACTAL.lock().map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))? {
             Fractal::F64(f) => save_png_get_data(f)?,
+            Fractal::F128(f) => save_png_get_data(f)?,
         }
     };
     let enum_index = FRACTAL.lock().map_err(|e| format!("Inner Error: Mutex lock failed: {}", e))?

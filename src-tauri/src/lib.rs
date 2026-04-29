@@ -1,5 +1,6 @@
 mod calculate;
 mod btm;
+mod multi_precision;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

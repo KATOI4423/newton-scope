@@ -50,6 +50,10 @@ impl <const N: usize> MD<N> {
     fn ctx() -> Context<HalfAway> {
         Context::<HalfAway>::new(N)
     }
+
+    pub(crate) fn to_f64(&self) -> f64 {
+        self.value.to_f64().value()
+    }
 }
 
 // e のキャッシュをグローバルに保持 (N: 精度 -> Fbig: 計算結果)
@@ -1301,14 +1305,9 @@ mod tests_real {
 
     // ── ヘルパー ──────────────────────────────────────────────
 
-    /// MD<N> の値を f64 に変換する
-    fn to_f64<const N: usize>(v: &MD<N>) -> f64 {
-        format!("{:.20e}", v).parse::<f64>().unwrap()
-    }
-
     /// f64 との近似一致チェック (相対誤差 tol)
     fn approx_eq<const N: usize>(a: &MD<N>, expected: f64, tol: f64) -> bool {
-        let got = to_f64(a);
+        let got = a.to_f64();
         if expected == 0.0 {
             got.abs() < tol
         } else {
@@ -1342,7 +1341,7 @@ mod tests_real {
         let cases = [0.0_f64, 1.0, -1.0, 0.5, 1e10, -1e10, 1e-10];
         for &v in &cases {
             let md = MD::<128>::from_f64(v);
-            let got = to_f64(&md);
+            let got = md.to_f64();
             assert!((got - v).abs() <= v.abs() * 1e-15 + 1e-300,
                 "from_f64 roundtrip: v={v}, got={got}");
         }
@@ -1603,7 +1602,7 @@ mod tests_real {
         assert!(approx_eq(&diff, 0.0, tol), "sin(π/2) != 1");
         // sin(π) ≈ 0
         let sin_pi = MD::<128>::pi().sin();
-        assert!(to_f64(&sin_pi).abs() < 1e-28, "sin(π) should be ~0: {:e}", sin_pi);
+        assert!(sin_pi.to_f64().abs() < 1e-28, "sin(π) should be ~0: {:e}", sin_pi);
     }
 
     #[test]
@@ -1617,7 +1616,7 @@ mod tests_real {
         assert!(approx_eq(&diff, 0.0, tol), "cos(π) != -1");
         // cos(π/2) ≈ 0
         let cos_pi_2 = MD::<128>::frac_pi_2().cos();
-        assert!(to_f64(&cos_pi_2).abs() < 1e-28, "cos(π/2) should be ~0");
+        assert!(cos_pi_2.to_f64().abs() < 1e-28, "cos(π/2) should be ~0");
     }
 
     #[test]
@@ -1820,7 +1819,7 @@ mod tests_real {
     fn tanh_range() {
         // tanh(x) ∈ (-1, 1)
         for v in [-10.0, -1.0, 0.0, 1.0, 10.0] {
-            let t = to_f64(&MD::<128>::from_f64(v).tanh());
+            let t = MD::<128>::from_f64(v).tanh().to_f64();
             assert!(t > -1.0 && t < 1.0, "tanh({v}) = {t} out of range");
         }
         // tanh(0) = 0
