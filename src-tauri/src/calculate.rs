@@ -28,6 +28,7 @@ use std::sync::{
 use crate::btm;
 use crate::multi_precision::{
     MD,
+    // F128,
 };
 
 /// 初期値
@@ -140,6 +141,7 @@ where
 enum Formulac {
     F64(FormulacInner<f64>),
     F128(FormulacInner<MD<128>>),
+    // F128(FormulacInner<F128>),
 }
 
 impl Default for Formulac {
@@ -324,6 +326,7 @@ where
 enum Fractal {
     F64(FractalInner<f64>),
     F128(FractalInner<MD<128>>),
+    // F128(FractalInner<F128>),
 }
 
 impl Default for Fractal {
@@ -384,6 +387,7 @@ impl Fractal {
 
                 let center = f.canvas().center();
                 let center = Complex::new(MD::from_f64(center.re), MD::from_f64(center.im));
+                // let center = Complex::new(F128::from_f64(center.re), F128::from_f64(center.im));
                 let zoom_level = f.canvas().zoom_level;
                 let size = f.canvas().size();
                 let canvas = Canvas { center, zoom_level, size };
