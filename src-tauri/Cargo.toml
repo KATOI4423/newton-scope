@@ -1,6 +1,6 @@
 [package]
 name = "newton-scope"
-version = "0.2.0"
+version = "0.2.1"
 description = "Newton Fractal Zoom App that operates on any formula"
 authors = ["KATOI4423 <katoi4423@gmail.com>"]
 license = "MIT OR Apache-2.0"
