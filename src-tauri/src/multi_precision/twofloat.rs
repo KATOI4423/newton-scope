@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 use formulac::core::Real;
 use num_traits::{
+    Float,
     Num,
     ToPrimitive,
     One,
@@ -35,6 +36,24 @@ impl F106 {
     }
     pub fn to_f64(&self) -> f64 {
         self.inner.hi() + self.inner.lo()
+    }
+    pub fn is_sign_negative(&self) -> bool {
+        self.inner.is_sign_negative()
+    }
+    pub fn infinity() -> Self {
+        Self { inner: TwoFloat::infinity() }
+    }
+    pub fn is_finite(&self) -> bool {
+        self.inner.is_finite()
+    }
+    pub fn is_infinite(&self) -> bool {
+        self.inner.is_infinite()
+    }
+    pub fn floor(&self) -> Self {
+        self.inner.floor().into()
+    }
+    pub fn new_add(hi: f64, lo: f64) -> Self {
+        TwoFloat::new_add(hi, lo).into()
     }
 }
 
