@@ -18,6 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.1" }
 
 [dependencies]
+bitflags = "2.11.1"
 bitvec = { version = "1.0.1" }
 dashu = "0.4.2"
 dashu-base = "0.4.1"

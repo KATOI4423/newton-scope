@@ -3,6 +3,7 @@
 //! 複素数引数のGamma関数
 //! 参考： shikino, https://slpr.sakura.ne.jp/qp/
 
+use bitflags::bitflags;
 use formulac::core::{
     ComplexMath,
     Real,
@@ -769,5 +770,232 @@ mod gamma_dd_tests {
         let result = z.gamma();
 
         assert!(result.re.is_finite());
+    }
+}
+
+bitflags! {
+    /// Digamma関数計算時の処理分岐フラグ
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DiggammaFlag: u8 {
+        const RECURRENCE = 0b01;
+        const REFLECTION = 0b10;
+    }
+}
+
+pub(crate) trait Digamma {
+    fn digamma(&self) -> Self;
+}
+
+impl Digamma for Complex<f64> {
+    fn digamma(&self) -> Self {
+        if self.im.is_zero() {
+            return Self::from(special::Gamma::digamma(self.re));
+        }
+
+        const ASYMPTOTIC_THRESHOLD: f64 = 10.0;
+        let (mut w, flag) = if self.re >= ASYMPTOTIC_THRESHOLD {
+            (*self, DiggammaFlag::empty())
+        } else if self.re >= 1.0 {
+            (self + ASYMPTOTIC_THRESHOLD, DiggammaFlag::RECURRENCE)
+        } else if self.re >= -(ASYMPTOTIC_THRESHOLD - 1.0) {
+            (1.0 - self + ASYMPTOTIC_THRESHOLD, DiggammaFlag::RECURRENCE | DiggammaFlag::REFLECTION)
+        } else {
+            (1.0 - self, DiggammaFlag::REFLECTION)
+        };
+
+        // 漸近展開
+        let mut s = w.ln() - 0.5 / w;
+        let mut wpow = Complex::ONE;
+        let w2 = w * w;
+        const NMAX: usize = 100;
+        const EPSILON: f64 = 1.0e-13;
+        const BERNOULLI: [f64; 101] = [ 1.0, -0.5,
+            0.16666666666666667,    0.0,   -0.033333333333333333,   0.0,    0.023809523809523810,   0.0,
+           -0.033333333333333333,   0.0,    0.075757575757575758,   0.0,   -0.25311355311355311,    0.0,
+            1.1666666666666667,     0.0,   -7.0921568627450980,     0.0,    54.971177944862155,     0.0,
+           -529.12424242424242,     0.0,    6192.1231884057971,     0.0,   -86580.253113553114,     0.0,
+            1.4255171666666667e6,   0.0,   -2.7298231067816092e7,   0.0,    6.0158087390064237e8,   0.0,
+           -1.5116315767092157e10,  0.0,    4.2961464306116667e11,  0.0,   -1.3711655205088333e13,  0.0,
+            4.8833231897359317e14,  0.0,   -1.9296579341940068e16,  0.0,    8.4169304757368262e17,  0.0,
+           -4.0338071854059455e19,  0.0,    2.1150748638081992e21,  0.0,   -1.2086626522296526e23,  0.0,
+            7.5008667460769644e24,  0.0,   -5.0387781014810689e26,  0.0,    3.6528776484818123e28,  0.0,
+           -2.8498769302450882e30,  0.0,    2.3865427499683628e32,  0.0,   -2.1399949257225334e34,  0.0,
+            2.0500975723478098e36,  0.0,   -2.0938005911346378e38,  0.0,    2.2752696488463516e40,  0.0,
+           -2.6257710286239576e42,  0.0,    3.2125082102718033e44,  0.0,   -4.1598278166794711e46,  0.0,
+            5.6920695482035280e48,  0.0,   -8.2183629419784576e50,  0.0,    1.2502904327166993e53,  0.0,
+           -2.0015583233248370e55,  0.0,    3.3674982915364374e57,  0.0,   -5.9470970503135448e59,  0.0,
+            1.1011910323627978e62,  0.0,   -2.1355259545253501e64,  0.0,    4.3328896986641192e66,  0.0,
+           -9.1885528241669328e68,  0.0,    2.0346896776329074e71,  0.0,   -4.7003833958035731e73,  0.0,
+            1.1318043445484249e76,  0.0,   -2.8382249570693707e78,
+        ];
+        for n in (2..=NMAX).step_by(2) {
+            wpow *= w2;
+            let ds = BERNOULLI[n] / (n as f64 * wpow);
+            s -= ds;
+            if ds.abs().re / s.abs().re < EPSILON {
+                break;
+            }
+        }
+
+        if flag.contains(DiggammaFlag::RECURRENCE) {
+            // 漸化式での展開
+            for _ in 0..ASYMPTOTIC_THRESHOLD as i32 {
+                s += (1.0 - w).inv();
+                w -= Complex::ONE;
+            }
+        }
+        if flag.contains(DiggammaFlag::REFLECTION) {
+            // 相反公式
+            s -= std::f64::consts::PI / (std::f64::consts::PI * self).tan();
+        }
+
+        s
+    }
+}
+
+#[cfg(test)]
+mod digamma_tests {
+    use super::*;
+    use num_complex::Complex;
+
+    const EPS: f64 = 1e-12;
+
+    fn approx_eq(a: Complex<f64>, b: Complex<f64>) {
+        assert!(
+            (a.re - b.re).abs() < EPS,
+            "re mismatch: actual={}, expected={}, err={}",
+            a.re,
+            b.re,
+            (a.re - b.re).abs(),
+        );
+
+        assert!(
+            (a.im - b.im).abs() < EPS,
+            "im mismatch: actual={}, expected={}, err={}",
+            a.im,
+            b.im,
+            (a.im - b.im).abs(),
+        );
+    }
+
+    #[test]
+    fn test_digamma_1() {
+        // ψ(1) = -γ
+        let z = Complex::new(1.0, 0.0);
+
+        let expected = Complex::new(
+            -0.5772156649015328606,
+            0.0,
+        );
+
+        approx_eq(z.digamma(), expected);
+    }
+
+    #[test]
+    fn test_digamma_half() {
+        // ψ(1/2) = -γ - 2ln2
+        let z = Complex::new(0.5, 0.0);
+
+        let expected = Complex::new(
+            -0.5772156649015328606 - 2.0 * std::f64::consts::LN_2,
+            0.0,
+        );
+
+        approx_eq(z.digamma(), expected);
+    }
+
+    #[test]
+    fn test_digamma_5() {
+        // ψ(5) = H4 - γ
+        // H4 = 1 + 1/2 + 1/3 + 1/4
+        let z = Complex::new(5.0, 0.0);
+
+        let h4 =
+            1.0 +
+            1.0 / 2.0 +
+            1.0 / 3.0 +
+            1.0 / 4.0;
+
+        let expected = Complex::new(
+            h4 - 0.5772156649015328606,
+            0.0,
+        );
+
+        approx_eq(z.digamma(), expected);
+    }
+
+    #[test]
+    fn test_digamma_recurrence() {
+        // ψ(z+1) = ψ(z) + 1/z
+        let z = Complex::new(2.3, -1.7);
+
+        let lhs = (z + Complex::new(1.0, 0.0)).digamma();
+        let rhs = z.digamma() + Complex::new(1.0, 0.0) / z;
+
+        approx_eq(lhs, rhs);
+    }
+
+    #[test]
+    fn test_digamma_reflection() {
+        // ψ(1-z) - ψ(z) = π cot(πz)
+        let z = Complex::new(0.3, 0.7);
+
+        let lhs = (Complex::new(1.0, 0.0) - z).digamma()
+            - z.digamma();
+
+        let rhs = Complex::new(std::f64::consts::PI, 0.0)
+            / (Complex::new(std::f64::consts::PI, 0.0) * z).tan();
+
+        approx_eq(lhs, rhs);
+    }
+
+    #[test]
+    fn test_digamma_large_real() {
+        // ψ(x) ≈ ln(x) - 1/(2x)
+        let x = 1000.0;
+
+        let z = Complex::new(x, 0.0);
+
+        let expected = Complex::new(
+            x.ln() - 1.0 / (2.0 * x) - 1.0 / (12.0 * x * x),
+            0.0,
+        );
+
+        approx_eq(z.digamma(), expected);
+    }
+
+    #[test]
+    fn test_digamma_complex() {
+        // reference:
+        // ψ(1+i)
+        let z = Complex::new(1.0, 1.0);
+
+        let expected = Complex::new(
+            0.09465032062247698,
+            1.0766740474685812,
+        );
+
+        approx_eq(z.digamma(), expected);
+    }
+
+    #[test]
+    fn test_digamma_pole_behavior() {
+        // negative integer poles
+        let z = Complex::new(-3.0 + 1e-10, 0.0);
+
+        let result = z.digamma();
+
+        assert!(result.re.is_finite());
+    }
+
+    #[test]
+    fn test_digamma_conjugate_symmetry() {
+        // ψ(conj(z)) = conj(ψ(z))
+        let z = Complex::new(1.3, 2.1);
+
+        let lhs = z.conj().digamma();
+        let rhs = z.digamma().conj();
+
+        approx_eq(lhs, rhs);
     }
 }
