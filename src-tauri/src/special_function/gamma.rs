@@ -999,3 +999,228 @@ mod digamma_tests {
         approx_eq(lhs, rhs);
     }
 }
+
+impl Digamma for Complex<F106> {
+    fn digamma(&self) -> Self {
+        const ASYMPTOTIC_THRESHOLD: f64 = 48.0;
+        let asymptotic_threshold = F106::new_add(ASYMPTOTIC_THRESHOLD, 0.0);
+        let (mut w, flag) = if self.re >= asymptotic_threshold {
+            (*self, DiggammaFlag::empty())
+        } else if self.re >= F106::one() {
+            (self + Self::from(asymptotic_threshold), DiggammaFlag::RECURRENCE)
+        } else if self.re >= -F106::new_sub(ASYMPTOTIC_THRESHOLD, 1.0) {
+            (Self::from(F106::new_add(ASYMPTOTIC_THRESHOLD, 1.0)) - self, DiggammaFlag::RECURRENCE | DiggammaFlag::REFLECTION)
+        } else {
+            (Self::one() - self, DiggammaFlag::REFLECTION)
+        };
+
+        // 漸近展開
+        let mut s = w.ln() - Self::from(F106::new_div(1.0, 2.0)) / w;
+        let mut wpow = Self::one();
+        let w2 = w * w;
+        const NMAX: usize = 100;
+        let epsilon = F106::from_f64(1.0e-30);
+        const BERNOULLI: [(f64, f64); 101] = [
+            ( 1.0, 0.0),                                        (-0.5, 0.0),
+            ( 0.16666666666666666,  9.25185853854297e-18),      ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
+            ( 0.023809523809523808,  1.1564823173178713e-18),   ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
+            ( 0.07575757575757576,  4.625929269271485e-18),     ( 0.0, 0.0),    (-0.2531135531135531, -1.5932354903638893e-17),     (0.0, 0.0),
+            ( 1.1666666666666667,  7.401486830834377e-17),      ( 0.0, 0.0),    (-7.092156862745098, -3.937485615430481e-16),       (0.0, 0.0),
+            ( 54.971177944862156,  3.5399513181164975e-15),     ( 0.0, 0.0),    (-529.1242424242424, -2.3181261777969393e-14),      (0.0, 0.0),
+            ( 6192.123188405797,  4.230510721041466e-13),       ( 0.0, 0.0),    (-86580.25311355311, -5.131072543066991e-12),       (0.0, 0.0),
+            ( 1.4255171666666667e6,  1.1901772303982087e-10),   ( 0.0, 0.0),    (-2.7298231067816092e7, -1.2294537361508116e-9),    (0.0, 0.0),
+            ( 6.015808739006424e8,  2.1513656602463484e-8),     ( 0.0, 0.0),    (-1.5116315767092157e10, -3.412109881334241e-7),    (0.0, 0.0),
+            ( 4.296146430611667e11,  4.87619354705441e-6),      ( 0.0, 0.0),    (-1.3711655205088333e13, -7.19858705194796e-5),     (0.0, 0.0),
+            ( 4.883323189735932e14,  9.728421338594596e-4),     ( 0.0, 0.0),    (-1.9296579341940068e16, -1.3438402985358228e-2),   (0.0, 0.0),
+            ( 8.416930475736826e17,  1.776278078731056e-1),     ( 0.0, 0.0),    (-4.0338071854059455e19, -2.453904586640381),       (0.0, 0.0),
+            ( 2.115074863808199e21,  3.309653411417951e1),      ( 0.0, 0.0),    (-1.2086626522296526e23, -4.492939416531365e2),     (0.0, 0.0),
+            ( 7.500866746076964e24,  6.220102123886591e3),      ( 0.0, 0.0),    (-5.038778101481069e26, -8.718095783017208e4),      (0.0, 0.0),
+            ( 3.6528776484818123e28,  1.2448044609432368e6),    ( 0.0, 0.0),    (-2.8498769302450882e30, -1.801889433742663e7),     (0.0, 0.0),
+            ( 2.386542749968363e32,  2.648595894282772e8),      ( 0.0, 0.0),    (-2.1399949257225334e34, -3.950540818649829e9),     (0.0, 0.0),
+            ( 2.05009757234781e36,  5.971637648692811e10),      ( 0.0, 0.0),    (-2.093800591134638e38, -9.136419317529385e11),     (0.0, 0.0),
+            ( 2.2752696488463516e40,  1.4147183562698286e13),   ( 0.0, 0.0),    (-2.6257710286239576e42, -2.214903726041735e14),    (0.0, 0.0),
+            ( 3.2125082102718033e44,  3.502697544636337e15),    ( 0.0, 0.0),    (-4.159827816679471e46, -5.591357851745446e16),     (0.0, 0.0),
+            ( 5.692069548203528e48,  9.006075389246522e17),     ( 0.0, 0.0),    (-8.218362941978458e50, -1.4624893159366468e19),    (0.0, 0.0),
+            ( 1.2502904327166993e53,  2.392222211683939e20),    ( 0.0, 0.0),    (-2.001558323324837e55, -3.9397097243832945e21),    (0.0, 0.0),
+            ( 3.3674982915364374e57,  6.535894613265916e22),    ( 0.0, 0.0),    (-5.947097050313545e59, -1.0914523514324591e24),    (0.0, 0.0),
+            ( 1.1011910323627978e62,  1.832975345573753e25),    ( 0.0, 0.0),    (-2.13552595452535e64, -3.095150159018877e26),      (0.0, 0.0),
+            ( 4.332889698664119e66,  5.254093497041323e27),     ( 0.0, 0.0),    (-9.188552824166933e68, -8.965214906522392e28),     (0.0, 0.0),
+            ( 2.0346896776329074e71,  1.536232694281383e30),    ( 0.0, 0.0),    (-4.700383395803573e73, -2.645561754689072e31),     (0.0, 0.0),
+            ( 1.131804344548425e76,  4.578674543209259e32),     ( 0.0, 0.0),    (-2.8382249570693707e78, 0.0),
+        ];
+        let bernoulli = BERNOULLI.map(|(hi, lo)| {
+            Self::from(F106::new_add(hi, lo))
+        });
+        for n in (2..=NMAX).step_by(2) {
+            wpow *= w2;
+            let ds = bernoulli[n] / (Self::from(F106::from_f64(n as f64)) * wpow);
+            s -= ds;
+            if ds.abs().re / s.abs().re < epsilon {
+                break;
+            }
+        }
+
+        if flag.contains(DiggammaFlag::RECURRENCE) {
+            // 漸化式での展開
+            for _ in 0..asymptotic_threshold.to_i32() {
+                s += (Self::one() - w).inv();
+                w -= Self::one();
+            }
+        }
+        if flag.contains(DiggammaFlag::REFLECTION) {
+            // 相反公式
+            let pi = Self::from(F106::pi());
+            let piz = pi * self;
+            s -= pi * piz.cos() / piz.sin();
+        }
+
+        s
+    }
+}
+
+#[cfg(test)]
+mod digamma_f106_tests {
+    use std::str::FromStr;
+    use crate::multi_precision::twofloat::F106;
+
+    use super::*;
+    use num_complex::Complex;
+
+    const EPSILON: f64 = 1e-13;
+
+    fn assert_close(
+        actual: F106,
+        expected: F106,
+        eps: f64,
+    ) {
+        let eps = F106::from_f64(eps);
+        let err = (actual - expected).abs();
+
+        assert!(
+            err <= eps,
+            "actual={:?}, expected={:?}, err={:?}, eps={:?}",
+            actual,
+            expected,
+            err,
+            eps,
+        );
+    }
+
+    fn assert_complex_close(
+        actual: Complex<F106>,
+        expected: Complex<F106>,
+        eps: f64,
+    ) {
+        let eps = F106::from_f64(eps);
+
+        let re_err = (actual.re - expected.re).abs();
+        let im_err = (actual.im - expected.im).abs();
+
+        assert!(
+            re_err <= eps,
+            "re mismatch: actual={:?}, expected={:?}, err={:?}, eps={:?}",
+            actual.re,
+            expected.re,
+            re_err,
+            eps,
+        );
+
+        assert!(
+            im_err <= eps,
+            "im mismatch: actual={:?}, expected={:?}, err={:?}, eps={:?}",
+            actual.im,
+            expected.im,
+            im_err,
+            eps,
+        );
+    }
+
+    #[test]
+    fn test_digamma_one() {
+        // ψ(1) = -γ
+        let actual = Complex::one().digamma();
+        let expected = Complex::from(F106::from_str("-0.577215664901532860606512090082402431042159335939923598805767234").unwrap());
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_half() {
+        // ψ(1/2) = -γ - 2ln2
+        let actual = Complex::from(F106::from_f64(0.5)).digamma();
+        let expected = Complex::from(F106::from_str("-1.963510026021423479440976332998755567193159604660434107047127253").unwrap());
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_minus_half() {
+        // ψ(-1/2) = ψ(1/2) + 2
+        let actual = Complex::from(-F106::from_f64(0.5)).digamma();
+        let expected = Complex::from(F106::from_str("0.0364899739785765205590236670012444328068403953395658929528727461").unwrap());
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_large_real() {
+        let actual = Complex::from(F106::from_f64(1000.0)).digamma();
+        let expected = Complex::from(F106::from_str("6.9072551956488120520500061142514977454795198337688800669678595150").unwrap());
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_i() {
+        let actual = Complex::i().digamma();
+        let expected = Complex::new(
+            F106::from_str("0.094650320622476977271878482721910722476262971763541623232989724").unwrap(),
+            F106::from_str("2.0766740474685811741340507947500004904456562664038166655750624").unwrap()
+        );
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_one_plus_i() {
+        let actual = Complex::new(F106::one(), F106::one()).digamma();
+        let expected = Complex::new(
+            F106::from_str("0.094650320622476977271878482721910722476262971763541623232989724").unwrap(),
+            F106::from_str("1.0766740474685811741340507947500004904456562664038166655750624").unwrap()
+        );
+        assert_complex_close(actual, expected, EPSILON);
+    }
+
+    #[test]
+    fn test_digamma_recurrence() {
+        // ψ(z+1) = ψ(z) + 1/z
+        let z = Complex::new(
+            F106::from_f64(0.3),
+            F106::from_f64(0.7),
+        );
+
+        let lhs = (z + Complex::one()).digamma();
+        let rhs = z.digamma() + z.inv();
+
+        let diff = lhs - rhs;
+
+        assert_complex_close(
+            diff,
+            Complex::zero(),
+            EPSILON,
+        );
+    }
+
+    #[test]
+    fn test_digamma_reflection() {
+        // ψ(1-z) - ψ(z) = π cot(πz)
+        let z = Complex::new(
+            F106::from_f64(0.25),
+            F106::from_f64(0.5),
+        );
+
+        let lhs = (Complex::<F106>::one() - z).digamma() - z.digamma();
+
+        let pi = Complex::from(F106::pi());
+        let rhs = pi / (pi * z).tan();
+
+        let diff = lhs - rhs;
+
+        assert_complex_close(diff, Complex::zero(), EPSILON);
+    }
+}
