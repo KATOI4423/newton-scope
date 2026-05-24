@@ -37,4 +37,4 @@ tauri = { version = "2.11.1" }
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-fs = "2.5.1"
 tauri-plugin-log = "2.8.0"
-twofloat = { version = "0.8.4", features = ["serde"] }
+twofloat = { version = "0.8.4", features = ["serde", "std"] }

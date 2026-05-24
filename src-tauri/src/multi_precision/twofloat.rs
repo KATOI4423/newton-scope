@@ -52,8 +52,17 @@ impl F106 {
     pub fn floor(&self) -> Self {
         self.inner.floor().into()
     }
-    pub fn new_add(hi: f64, lo: f64) -> Self {
-        TwoFloat::new_add(hi, lo).into()
+    pub fn new_add(lhs: f64, rhs: f64) -> Self {
+        TwoFloat::new_add(lhs, rhs).into()
+    }
+    pub fn new_sub(lhs: f64, rhs: f64) -> Self {
+        TwoFloat::new_sub(lhs, rhs).into()
+    }
+    pub fn new_mul(lhs: f64, rhs: f64) -> Self {
+        TwoFloat::new_mul(lhs, rhs).into()
+    }
+    pub fn new_div(lhs: f64, rhs: f64) -> Self {
+        TwoFloat::new_div(lhs, rhs).into()
     }
 }
 

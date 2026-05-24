@@ -1,4 +1,3 @@
-use formulac::functions::Arity;
 use formulac::{
     self,
     core::Real,
@@ -34,7 +33,10 @@ use crate::multi_precision::{
     F106,
 };
 use crate::special_function::{
-    gamma::Gamma,
+    gamma::{
+        Gamma,
+        Digamma,
+    },
 };
 
 /// 初期値
@@ -103,12 +105,11 @@ where
 
     fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError>
     where
-        Complex<T>: Gamma,
+        Complex<T>: Gamma + Digamma,
     {
         let gamma = UserFn::new("gamma", |[z]: [Complex<T>; ARITY]| z.gamma())
-            .with_derivative([UserFn::new("gamma'", |[z]| {
-                todo!()
-            })]).expect("The count of derivatives are different from ARITY");
+            .with_derivative([UserFn::new("gamma'", |[z]| { z.gamma() * z.digamma()})])
+            .expect("The count of derivatives are different from ARITY");
         let (f, df) = formulac::Builder::<T, ARITY>::new(formula, ["z"])
             .with_user_functions([
                 gamma
@@ -143,7 +144,7 @@ impl<T: Real> Default for FormulacInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
-    Complex<T>: Gamma,
+    Complex<T>: Gamma + Digamma,
 {
     fn default() -> Self {
         let mut default = Self::new();
