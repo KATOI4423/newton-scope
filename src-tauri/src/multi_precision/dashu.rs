@@ -229,7 +229,8 @@ impl <const N: usize, const B: u64> From<FBig<HalfAway, B>> for MD<N> {
             // inf, nan は 四則演算を適応できないので、正規化せずにそのまま返す
             return Self { value: fbig2 };
         }
-        let normalized = Self::ctx().add(fbig2.repr(), FBig::<HalfAway>::ZERO.repr()).value();
+        let normalized = Self::ctx().add(fbig2.repr(), FBig::<HalfAway>::ZERO.repr())
+            .expect("Failed to nomalized").value();
         Self { value: normalized }
     }
 }
@@ -390,59 +391,68 @@ impl <const N: usize> RemAssign<&Self> for MD<N> {
 impl <const N: usize> Add for MD<N> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        Self::ctx().add(self.value.repr(), rhs.value.repr()).value().into()
+        Self::ctx().add(self.value.repr(), rhs.value.repr())
+            .expect("Failed to Add").value().into()
     }
 }
 impl <const N: usize> Add for &MD<N> {
     type Output = MD<N>;
     fn add(self, rhs: Self) -> Self::Output {
-        MD::<N>::ctx().add(self.value.repr(), rhs.value.repr()).value().into()
+        MD::<N>::ctx().add(self.value.repr(), rhs.value.repr())
+            .expect("Failed to &Add").value().into()
     }
 }
 
 impl <const N: usize> Sub for MD<N> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        Self::ctx().sub(self.value.repr(), rhs.value.repr()).value().into()
+        Self::ctx().sub(self.value.repr(), rhs.value.repr())
+            .expect("Failed to Sub").value().into()
     }
 }
 impl <const N: usize> Sub for &MD<N> {
     type Output = MD<N>;
     fn sub(self, rhs: Self) -> Self::Output {
-        MD::<N>::ctx().sub(self.value.repr(), rhs.value.repr()).value().into()
+        MD::<N>::ctx().sub(self.value.repr(), rhs.value.repr())
+            .expect("Failed to &Sub").value().into()
     }
 }
 
 impl <const N: usize> Mul for MD<N> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        Self::ctx().mul(self.value.repr(), rhs.value.repr()).value().into()
+        Self::ctx().mul(self.value.repr(), rhs.value.repr())
+            .expect("Failed to Mul").value().into()
     }
 }
 impl <const N: usize> Mul for &MD<N> {
     type Output = MD<N>;
     fn mul(self, rhs: Self) -> Self::Output {
-        MD::<N>::ctx().mul(self.value.repr(), rhs.value.repr()).value().into()
+        MD::<N>::ctx().mul(self.value.repr(), rhs.value.repr())
+            .expect("Failed to &Mul").value().into()
     }
 }
 
 impl <const N: usize> Div for MD<N> {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        Self::ctx().div(self.value.repr(), rhs.value.repr()).value().into()
+        Self::ctx().div(self.value.repr(), rhs.value.repr())
+            .expect("Failed to Div").value().into()
     }
 }
 impl <const N: usize> Div for &MD<N> {
     type Output = MD<N>;
     fn div(self, rhs: Self) -> Self::Output {
-        MD::<N>::ctx().div(self.value.repr(), rhs.value.repr()).value().into()
+        MD::<N>::ctx().div(self.value.repr(), rhs.value.repr())
+            .expect("Failed to &Div").value().into()
     }
 }
 
 impl <const N: usize> Rem for MD<N> {
     type Output = Self;
     fn rem(self, rhs: Self) -> Self::Output {
-        let rem = Self::ctx().rem(self.value.repr(), rhs.value.repr()).value();
+        let rem = Self::ctx().rem(self.value.repr(), rhs.value.repr())
+            .expect("Failed to Rem").value();
         let mut res: Self = rem.into();
         // ユークリッド除法（常に正の余りを返す）に合わせる
         if res.value.is_negative() {
@@ -455,7 +465,8 @@ impl <const N: usize> Rem for MD<N> {
 impl <const N: usize> Rem for &MD<N> {
     type Output = MD<N>;
     fn rem(self, rhs: Self) -> Self::Output {
-        let rem = MD::<N>::ctx().rem(self.value.repr(), rhs.value.repr()).value();
+        let rem = MD::<N>::ctx().rem(self.value.repr(), rhs.value.repr())
+            .expect("Failed to &Rem").value();
         let mut res = MD::<N>::from(rem);
         // ユークリッド除法（常に正の余りを返す）に合わせる
         if res.value.is_negative() {
@@ -819,12 +830,14 @@ impl <const N: usize> Real for MD<N> {
             let ctx = Self::ctx();
             // x % 2π
             let v = &self.value;
-            let q = ctx.div(v.repr(), tau.value.repr()).value();
+            let q = ctx.div(v.repr(), tau.value.repr())
+                .expect("Failed to sin_cos").value();
             let q_floor = q.floor();
             let r = ctx.sub(
                 v.repr(),
-                ctx.mul(q_floor.repr(), tau.value.repr()).value().repr()
-            ).value();
+                ctx.mul(q_floor.repr(), tau.value.repr())
+                    .expect("Failed to sin_cos").value().repr()
+            ).expect("Failed to sin_cos").value();
             Self::from(r)
         };
 
@@ -844,7 +857,8 @@ impl <const N: usize> Real for MD<N> {
         let mut r = reduced;
         let threshold = Self::frac_pi_8();
         while r > threshold {
-            r = Self::ctx().div(r.value.repr(), two.value.repr()).value().into();
+            r = Self::ctx().div(r.value.repr(), two.value.repr())
+                .expect("Failed to sin_cos").value().into();
             half_count += 1;
         }
 
@@ -897,10 +911,12 @@ impl <const N: usize> Real for MD<N> {
 
     // Exponential and Logarithmic
     fn exp(self) -> Self {
-        Self::ctx().exp(self.value.repr()).value().into()
+        Self::ctx().exp(self.value.repr(), None)
+            .expect("Failed to exp").value().into()
     }
     fn ln(self) -> Self {
-        Self::ctx().ln(self.value.repr()).value().into()
+        Self::ctx().ln(self.value.repr(), None)
+            .expect("Failed to ln").value().into()
     }
     fn log10(self) -> Self {
         self.ln() / Self::ln_10()
@@ -908,7 +924,8 @@ impl <const N: usize> Real for MD<N> {
 
     // Others
     fn sqrt(self) -> Self {
-        Self::ctx().sqrt(self.value.repr()).value().into()
+        Self::ctx().sqrt(self.value.repr())
+            .expect("Failed to sqrt").value().into()
     }
     fn abs(self) -> Self {
         self.value.abs().into()
