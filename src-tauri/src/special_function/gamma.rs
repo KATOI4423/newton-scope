@@ -1000,6 +1000,35 @@ mod digamma_tests {
     }
 }
 
+const DIGAMMA_BERNOULLI: [(f64, f64); 101] = [
+        ( 1.0, 0.0),                                        (-0.5, 0.0),
+        ( 0.16666666666666666,  9.25185853854297e-18),      ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
+        ( 0.023809523809523808,  1.1564823173178713e-18),   ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
+        ( 0.07575757575757576,  4.625929269271485e-18),     ( 0.0, 0.0),    (-0.2531135531135531, -1.5932354903638893e-17),     (0.0, 0.0),
+        ( 1.1666666666666667,  7.401486830834377e-17),      ( 0.0, 0.0),    (-7.092156862745098, -3.937485615430481e-16),       (0.0, 0.0),
+        ( 54.971177944862156,  3.5399513181164975e-15),     ( 0.0, 0.0),    (-529.1242424242424, -2.3181261777969393e-14),      (0.0, 0.0),
+        ( 6192.123188405797,  4.230510721041466e-13),       ( 0.0, 0.0),    (-86580.25311355311, -5.131072543066991e-12),       (0.0, 0.0),
+        ( 1.4255171666666667e6,  1.1901772303982087e-10),   ( 0.0, 0.0),    (-2.7298231067816092e7, -1.2294537361508116e-9),    (0.0, 0.0),
+        ( 6.015808739006424e8,  2.1513656602463484e-8),     ( 0.0, 0.0),    (-1.5116315767092157e10, -3.412109881334241e-7),    (0.0, 0.0),
+        ( 4.296146430611667e11,  4.87619354705441e-6),      ( 0.0, 0.0),    (-1.3711655205088333e13, -7.19858705194796e-5),     (0.0, 0.0),
+        ( 4.883323189735932e14,  9.728421338594596e-4),     ( 0.0, 0.0),    (-1.9296579341940068e16, -1.3438402985358228e-2),   (0.0, 0.0),
+        ( 8.416930475736826e17,  1.776278078731056e-1),     ( 0.0, 0.0),    (-4.0338071854059455e19, -2.453904586640381),       (0.0, 0.0),
+        ( 2.115074863808199e21,  3.309653411417951e1),      ( 0.0, 0.0),    (-1.2086626522296526e23, -4.492939416531365e2),     (0.0, 0.0),
+        ( 7.500866746076964e24,  6.220102123886591e3),      ( 0.0, 0.0),    (-5.038778101481069e26, -8.718095783017208e4),      (0.0, 0.0),
+        ( 3.6528776484818123e28,  1.2448044609432368e6),    ( 0.0, 0.0),    (-2.8498769302450882e30, -1.801889433742663e7),     (0.0, 0.0),
+        ( 2.386542749968363e32,  2.648595894282772e8),      ( 0.0, 0.0),    (-2.1399949257225334e34, -3.950540818649829e9),     (0.0, 0.0),
+        ( 2.05009757234781e36,  5.971637648692811e10),      ( 0.0, 0.0),    (-2.093800591134638e38, -9.136419317529385e11),     (0.0, 0.0),
+        ( 2.2752696488463516e40,  1.4147183562698286e13),   ( 0.0, 0.0),    (-2.6257710286239576e42, -2.214903726041735e14),    (0.0, 0.0),
+        ( 3.2125082102718033e44,  3.502697544636337e15),    ( 0.0, 0.0),    (-4.159827816679471e46, -5.591357851745446e16),     (0.0, 0.0),
+        ( 5.692069548203528e48,  9.006075389246522e17),     ( 0.0, 0.0),    (-8.218362941978458e50, -1.4624893159366468e19),    (0.0, 0.0),
+        ( 1.2502904327166993e53,  2.392222211683939e20),    ( 0.0, 0.0),    (-2.001558323324837e55, -3.9397097243832945e21),    (0.0, 0.0),
+        ( 3.3674982915364374e57,  6.535894613265916e22),    ( 0.0, 0.0),    (-5.947097050313545e59, -1.0914523514324591e24),    (0.0, 0.0),
+        ( 1.1011910323627978e62,  1.832975345573753e25),    ( 0.0, 0.0),    (-2.13552595452535e64, -3.095150159018877e26),      (0.0, 0.0),
+        ( 4.332889698664119e66,  5.254093497041323e27),     ( 0.0, 0.0),    (-9.188552824166933e68, -8.965214906522392e28),     (0.0, 0.0),
+        ( 2.0346896776329074e71,  1.536232694281383e30),    ( 0.0, 0.0),    (-4.700383395803573e73, -2.645561754689072e31),     (0.0, 0.0),
+        ( 1.131804344548425e76,  4.578674543209259e32),     ( 0.0, 0.0),    (-2.8382249570693707e78, 0.0),
+    ];
+
 impl Digamma for Complex<F106> {
     fn digamma(&self) -> Self {
         const ASYMPTOTIC_THRESHOLD: f64 = 48.0;
@@ -1020,35 +1049,8 @@ impl Digamma for Complex<F106> {
         let w2 = w * w;
         const NMAX: usize = 100;
         let epsilon = F106::from_f64(1.0e-30);
-        const BERNOULLI: [(f64, f64); 101] = [
-            ( 1.0, 0.0),                                        (-0.5, 0.0),
-            ( 0.16666666666666666,  9.25185853854297e-18),      ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
-            ( 0.023809523809523808,  1.1564823173178713e-18),   ( 0.0, 0.0),    (-0.03333333333333333, -2.3129646346357427e-18),    (0.0, 0.0),
-            ( 0.07575757575757576,  4.625929269271485e-18),     ( 0.0, 0.0),    (-0.2531135531135531, -1.5932354903638893e-17),     (0.0, 0.0),
-            ( 1.1666666666666667,  7.401486830834377e-17),      ( 0.0, 0.0),    (-7.092156862745098, -3.937485615430481e-16),       (0.0, 0.0),
-            ( 54.971177944862156,  3.5399513181164975e-15),     ( 0.0, 0.0),    (-529.1242424242424, -2.3181261777969393e-14),      (0.0, 0.0),
-            ( 6192.123188405797,  4.230510721041466e-13),       ( 0.0, 0.0),    (-86580.25311355311, -5.131072543066991e-12),       (0.0, 0.0),
-            ( 1.4255171666666667e6,  1.1901772303982087e-10),   ( 0.0, 0.0),    (-2.7298231067816092e7, -1.2294537361508116e-9),    (0.0, 0.0),
-            ( 6.015808739006424e8,  2.1513656602463484e-8),     ( 0.0, 0.0),    (-1.5116315767092157e10, -3.412109881334241e-7),    (0.0, 0.0),
-            ( 4.296146430611667e11,  4.87619354705441e-6),      ( 0.0, 0.0),    (-1.3711655205088333e13, -7.19858705194796e-5),     (0.0, 0.0),
-            ( 4.883323189735932e14,  9.728421338594596e-4),     ( 0.0, 0.0),    (-1.9296579341940068e16, -1.3438402985358228e-2),   (0.0, 0.0),
-            ( 8.416930475736826e17,  1.776278078731056e-1),     ( 0.0, 0.0),    (-4.0338071854059455e19, -2.453904586640381),       (0.0, 0.0),
-            ( 2.115074863808199e21,  3.309653411417951e1),      ( 0.0, 0.0),    (-1.2086626522296526e23, -4.492939416531365e2),     (0.0, 0.0),
-            ( 7.500866746076964e24,  6.220102123886591e3),      ( 0.0, 0.0),    (-5.038778101481069e26, -8.718095783017208e4),      (0.0, 0.0),
-            ( 3.6528776484818123e28,  1.2448044609432368e6),    ( 0.0, 0.0),    (-2.8498769302450882e30, -1.801889433742663e7),     (0.0, 0.0),
-            ( 2.386542749968363e32,  2.648595894282772e8),      ( 0.0, 0.0),    (-2.1399949257225334e34, -3.950540818649829e9),     (0.0, 0.0),
-            ( 2.05009757234781e36,  5.971637648692811e10),      ( 0.0, 0.0),    (-2.093800591134638e38, -9.136419317529385e11),     (0.0, 0.0),
-            ( 2.2752696488463516e40,  1.4147183562698286e13),   ( 0.0, 0.0),    (-2.6257710286239576e42, -2.214903726041735e14),    (0.0, 0.0),
-            ( 3.2125082102718033e44,  3.502697544636337e15),    ( 0.0, 0.0),    (-4.159827816679471e46, -5.591357851745446e16),     (0.0, 0.0),
-            ( 5.692069548203528e48,  9.006075389246522e17),     ( 0.0, 0.0),    (-8.218362941978458e50, -1.4624893159366468e19),    (0.0, 0.0),
-            ( 1.2502904327166993e53,  2.392222211683939e20),    ( 0.0, 0.0),    (-2.001558323324837e55, -3.9397097243832945e21),    (0.0, 0.0),
-            ( 3.3674982915364374e57,  6.535894613265916e22),    ( 0.0, 0.0),    (-5.947097050313545e59, -1.0914523514324591e24),    (0.0, 0.0),
-            ( 1.1011910323627978e62,  1.832975345573753e25),    ( 0.0, 0.0),    (-2.13552595452535e64, -3.095150159018877e26),      (0.0, 0.0),
-            ( 4.332889698664119e66,  5.254093497041323e27),     ( 0.0, 0.0),    (-9.188552824166933e68, -8.965214906522392e28),     (0.0, 0.0),
-            ( 2.0346896776329074e71,  1.536232694281383e30),    ( 0.0, 0.0),    (-4.700383395803573e73, -2.645561754689072e31),     (0.0, 0.0),
-            ( 1.131804344548425e76,  4.578674543209259e32),     ( 0.0, 0.0),    (-2.8382249570693707e78, 0.0),
-        ];
-        let bernoulli = BERNOULLI.map(|(hi, lo)| {
+
+        let bernoulli = DIGAMMA_BERNOULLI.map(|(hi, lo)| {
             Self::from(F106::new_add(hi, lo))
         });
         for n in (2..=NMAX).step_by(2) {
@@ -1082,6 +1084,7 @@ impl Digamma for Complex<F106> {
 mod digamma_f106_tests {
     use std::str::FromStr;
     use crate::multi_precision::twofloat::F106;
+    use crate::multi_precision::MD;
 
     use super::*;
     use num_complex::Complex;
@@ -1132,6 +1135,499 @@ mod digamma_f106_tests {
             expected.im,
             im_err,
             eps,
+        );
+    }
+
+    fn f106_to_md_complex(
+        z: Complex<F106>,
+    ) -> (MD<128>, MD<128>) {
+        (z.re.to_md128(), z.im.to_md128())
+    }
+
+    // ------------------------------------------------------------
+    // F106 vs MD<128> diagnostic for digamma intermediate values
+    // ------------------------------------------------------------
+
+    #[derive(Debug)]
+    struct DigammaTracePoint {
+        name: String,
+        re: MD<128>,
+        im: MD<128>,
+    }
+
+    fn record_f106(
+        trace: &mut Vec<DigammaTracePoint>,
+        name: impl Into<String>,
+        z: &Complex<F106>,
+    ) {
+        trace.push(DigammaTracePoint {
+            name: name.into(),
+            re: z.re.to_md128(),
+            im: z.im.to_md128(),
+        });
+    }
+
+    fn record_md128(
+        trace: &mut Vec<DigammaTracePoint>,
+        name: impl Into<String>,
+        z: &Complex<MD<128>>,
+    ) {
+        trace.push(DigammaTracePoint {
+            name: name.into(),
+            re: z.re.clone(),
+            im: z.im.clone(),
+        });
+    }
+
+    fn md_scalar(v: MD<128>) -> Complex<MD<128>> {
+        Complex::from(v)
+    }
+
+    fn to_md_complex(z: Complex<F106>) -> Complex<MD<128>> {
+        let (re, im) = f106_to_md_complex(z);
+        Complex::new(re, im)
+    }
+
+    fn trace_digamma_f106(
+        z: &Complex<F106>,
+        prefix: &str,
+        trace: &mut Vec<DigammaTracePoint>,
+    ) -> Complex<F106> {
+        record_f106(trace, format!("{prefix}.input"), z);
+
+        const ASYMPTOTIC_THRESHOLD: f64 = 48.0;
+        let asymptotic_threshold = F106::new_add(ASYMPTOTIC_THRESHOLD, 0.0);
+        let (mut w, flag) = if z.re >= asymptotic_threshold {
+            (*z, DiggammaFlag::empty())
+        } else if z.re >= F106::one() {
+            (z + Complex::from(asymptotic_threshold), DiggammaFlag::RECURRENCE)
+        } else if z.re >= -F106::new_sub(ASYMPTOTIC_THRESHOLD, 1.0) {
+            (
+                Complex::from(F106::new_add(ASYMPTOTIC_THRESHOLD, 1.0)) - z,
+                DiggammaFlag::RECURRENCE | DiggammaFlag::REFLECTION,
+            )
+        } else {
+            (Complex::<F106>::one() - z, DiggammaFlag::REFLECTION)
+        };
+        record_f106(trace, format!("{prefix}.w_initial"), &w);
+
+        let log_w = w.ln();
+        let half_over_w = Complex::from(F106::new_div(1.0, 2.0)) / w;
+        let mut s = log_w - half_over_w;
+        record_f106(trace, format!("{prefix}.log_w"), &log_w);
+        record_f106(trace, format!("{prefix}.half_over_w"), &half_over_w);
+        record_f106(trace, format!("{prefix}.asymptotic_sum_initial"), &s);
+
+        let mut wpow = Complex::one();
+        let w2 = w * w;
+        record_f106(trace, format!("{prefix}.w_squared"), &w2);
+
+        const NMAX: usize = 100;
+        let epsilon = F106::from_f64(1.0e-30);
+        let bernoulli = DIGAMMA_BERNOULLI.map(|(hi, lo)| {
+            Complex::from(F106::new_add(hi, lo))
+        });
+
+        for n in (2..=NMAX).step_by(2) {
+            wpow *= w2;
+            let denominator = Complex::from(F106::from_f64(n as f64)) * wpow;
+            let ds = bernoulli[n] / denominator;
+            s -= ds;
+
+            let stage = format!("{prefix}.asym_n{n:03}");
+            record_f106(trace, format!("{stage}.bernoulli"), &bernoulli[n]);
+            record_f106(trace, format!("{stage}.wpow"), &wpow);
+            record_f106(trace, format!("{stage}.denominator"), &denominator);
+            record_f106(trace, format!("{stage}.term"), &ds);
+            record_f106(trace, format!("{stage}.sum"), &s);
+
+            let ratio = ds.abs().re / s.abs().re;
+            record_f106(trace, format!("{stage}.relative_term"), &Complex::from(ratio));
+            if ratio < epsilon {
+                record_f106(trace, format!("{prefix}.asymptotic_stop_n"), &Complex::from(F106::from_f64(n as f64)));
+                break;
+            }
+        }
+
+        if flag.contains(DiggammaFlag::RECURRENCE) {
+            for i in 0..asymptotic_threshold.to_i32() {
+                let stage = format!("{prefix}.recurrence_{i:02}");
+                record_f106(trace, format!("{stage}.w_before"), &w);
+                let term = (Complex::<F106>::one() - w).inv();
+                record_f106(trace, format!("{stage}.term"), &term);
+                s += term;
+                record_f106(trace, format!("{stage}.sum"), &s);
+                w -= Complex::one();
+            }
+        }
+
+        if flag.contains(DiggammaFlag::REFLECTION) {
+            let pi = Complex::from(F106::pi());
+            let piz = pi * z;
+            let cos_piz = piz.cos();
+            let sin_piz = piz.sin();
+            let reflection_term = pi * cos_piz / sin_piz;
+
+            record_f106(trace, format!("{prefix}.reflection.piz"), &piz);
+            record_f106(trace, format!("{prefix}.reflection.cos"), &cos_piz);
+            record_f106(trace, format!("{prefix}.reflection.sin"), &sin_piz);
+            record_f106(trace, format!("{prefix}.reflection.term"), &reflection_term);
+            s -= reflection_term;
+            record_f106(trace, format!("{prefix}.after_reflection"), &s);
+        }
+
+        record_f106(trace, format!("{prefix}.result"), &s);
+        s
+    }
+
+    fn trace_digamma_md128(
+        z: &Complex<MD<128>>,
+        prefix: &str,
+        trace: &mut Vec<DigammaTracePoint>,
+    ) -> Complex<MD<128>> {
+        record_md128(trace, format!("{prefix}.input"), z);
+
+        let threshold = MD::<128>::from(48);
+        let one_real = MD::<128>::one();
+        let (mut w, flag) = if z.re >= threshold {
+            (z.clone(), DiggammaFlag::empty())
+        } else if z.re >= one_real {
+            (z.clone() + md_scalar(threshold.clone()), DiggammaFlag::RECURRENCE)
+        } else if z.re >= -MD::<128>::from(47) {
+            (
+                md_scalar(MD::<128>::from(49)) - z.clone(),
+                DiggammaFlag::RECURRENCE | DiggammaFlag::REFLECTION,
+            )
+        } else {
+            (Complex::<MD<128>>::one() - z.clone(), DiggammaFlag::REFLECTION)
+        };
+        record_md128(trace, format!("{prefix}.w_initial"), &w);
+
+        let half = MD::<128>::one() / MD::<128>::from(2);
+        let log_w = w.clone().ln();
+        let half_over_w = md_scalar(half) / w.clone();
+        let mut s = log_w.clone() - half_over_w.clone();
+        record_md128(trace, format!("{prefix}.log_w"), &log_w);
+        record_md128(trace, format!("{prefix}.half_over_w"), &half_over_w);
+        record_md128(trace, format!("{prefix}.asymptotic_sum_initial"), &s);
+
+        let mut wpow = Complex::<MD<128>>::one();
+        let w2 = w.clone() * w.clone();
+        record_md128(trace, format!("{prefix}.w_squared"), &w2);
+
+        const NMAX: usize = 100;
+        let epsilon = MD::<128>::from_f64(1.0e-30);
+        // Convert the actual F106-rounded coefficients to MD<128>.
+        // This keeps coefficient rounding identical and isolates the arithmetic.
+        let bernoulli = DIGAMMA_BERNOULLI.map(|(hi, lo)| {
+            md_scalar(F106::new_add(hi, lo).to_md128())
+        });
+
+        for n in (2..=NMAX).step_by(2) {
+            wpow *= w2.clone();
+            let denominator = md_scalar(MD::<128>::from_f64(n as f64)) * wpow.clone();
+            let ds = bernoulli[n].clone() / denominator.clone();
+            s -= ds.clone();
+
+            let stage = format!("{prefix}.asym_n{n:03}");
+            record_md128(trace, format!("{stage}.bernoulli"), &bernoulli[n]);
+            record_md128(trace, format!("{stage}.wpow"), &wpow);
+            record_md128(trace, format!("{stage}.denominator"), &denominator);
+            record_md128(trace, format!("{stage}.term"), &ds);
+            record_md128(trace, format!("{stage}.sum"), &s);
+
+            let ratio = ds.clone().abs().re / s.clone().abs().re;
+            record_md128(trace, format!("{stage}.relative_term"), &md_scalar(ratio.clone()));
+            if ratio < epsilon {
+                record_md128(trace, format!("{prefix}.asymptotic_stop_n"), &md_scalar(MD::<128>::from_f64(n as f64)));
+                break;
+            }
+        }
+
+        if flag.contains(DiggammaFlag::RECURRENCE) {
+            for i in 0..threshold.to_i32() {
+                let stage = format!("{prefix}.recurrence_{i:02}");
+                record_md128(trace, format!("{stage}.w_before"), &w);
+                let term = (Complex::<MD<128>>::one() - w.clone()).inv();
+                record_md128(trace, format!("{stage}.term"), &term);
+                s += term.clone();
+                record_md128(trace, format!("{stage}.sum"), &s);
+                w -= Complex::<MD<128>>::one();
+            }
+        }
+
+        if flag.contains(DiggammaFlag::REFLECTION) {
+            // Match the F106 path's pi constant first; this isolates arithmetic
+            // and elementary-function differences from the pi-constant error.
+            let pi = md_scalar(F106::pi().to_md128());
+            let piz = pi.clone() * z.clone();
+            let cos_piz = piz.clone().cos();
+            let sin_piz = piz.clone().sin();
+            let reflection_term = pi.clone() * cos_piz.clone() / sin_piz.clone();
+
+            record_md128(trace, format!("{prefix}.reflection.piz"), &piz);
+            record_md128(trace, format!("{prefix}.reflection.cos"), &cos_piz);
+            record_md128(trace, format!("{prefix}.reflection.sin"), &sin_piz);
+            record_md128(trace, format!("{prefix}.reflection.term"), &reflection_term);
+            s -= reflection_term;
+            record_md128(trace, format!("{prefix}.after_reflection"), &s);
+        }
+
+        record_md128(trace, format!("{prefix}.result"), &s);
+        s
+    }
+
+    fn compare_digamma_traces(
+        title: &str,
+        f106_trace: &[DigammaTracePoint],
+        md_trace: &[DigammaTracePoint],
+    ) {
+        println!("\n========== {title} ==========");
+        let mut first_large: Option<String> = None;
+        let diagnostic_threshold = MD::<128>::from_f64(1.0e-20);
+
+        for f in f106_trace {
+            if let Some(m) = md_trace.iter().find(|m| m.name == f.name) {
+                let re_delta = f.re.clone() - m.re.clone();
+                let im_delta = f.im.clone() - m.im.clone();
+                if first_large.is_none()
+                    && (re_delta.clone().abs() > diagnostic_threshold
+                        || im_delta.clone().abs() > diagnostic_threshold)
+                {
+                    first_large = Some(f.name.clone());
+                }
+
+                println!(
+                    "{:<48} Δre={:.8e} Δim={:.8e} | F106=({:.20e}, {:.20e}) MD=({:.20e}, {:.20e})",
+                    f.name,
+                    re_delta,
+                    im_delta,
+                    f.re,
+                    f.im,
+                    m.re,
+                    m.im,
+                );
+            } else {
+                println!("{:<48} missing in MD trace", f.name);
+            }
+        }
+
+        if let Some(name) = first_large {
+            println!("FIRST |delta| > 1e-20: {name}");
+        } else {
+            println!("No matched stage has |delta| > 1e-20.");
+        }
+
+        for m in md_trace {
+            if !f106_trace.iter().any(|f| f.name == m.name) {
+                println!("{:<48} missing in F106 trace", m.name);
+            }
+        }
+    }
+
+    #[test]
+    fn debug_digamma_reflection_md128() {
+        // This is the exact input used by test_digamma_reflection().
+        let z = Complex::new(
+            F106::from_f64(0.25),
+            F106::from_f64(0.5),
+        );
+        let one_minus_z = Complex::<F106>::one() - z;
+
+        let mut f_z_trace = Vec::new();
+        let psi_z_f106 = trace_digamma_f106(&z, "psi_z", &mut f_z_trace);
+        assert_eq!(psi_z_f106, z.digamma(), "F106 trace must mirror digamma()");
+
+        let mut md_z_trace = Vec::new();
+        let md_z = to_md_complex(z);
+        let psi_z_md = trace_digamma_md128(&md_z, "psi_z", &mut md_z_trace);
+        compare_digamma_traces("psi(z): F106 vs MD<128>", &f_z_trace, &md_z_trace);
+
+        let mut f_one_minus_z_trace = Vec::new();
+        let psi_one_minus_z_f106 = trace_digamma_f106(
+            &one_minus_z,
+            "psi_1_minus_z",
+            &mut f_one_minus_z_trace,
+        );
+        assert_eq!(
+            psi_one_minus_z_f106,
+            one_minus_z.digamma(),
+            "F106 trace must mirror digamma()",
+        );
+
+        let mut md_one_minus_z_trace = Vec::new();
+        let md_one_minus_z = to_md_complex(one_minus_z);
+        let psi_one_minus_z_md = trace_digamma_md128(
+            &md_one_minus_z,
+            "psi_1_minus_z",
+            &mut md_one_minus_z_trace,
+        );
+        compare_digamma_traces(
+            "psi(1-z): F106 vs MD<128>",
+            &f_one_minus_z_trace,
+            &md_one_minus_z_trace,
+        );
+
+        // Compare the reflection identity's final assembly too.
+        let lhs_f106 = psi_one_minus_z_f106 - psi_z_f106;
+        let pi_f106 = Complex::from(F106::pi());
+        let piz_f106 = pi_f106 * z;
+        let rhs_tan_f106 = pi_f106 / piz_f106.tan();
+        let rhs_sincos_f106 = pi_f106 * piz_f106.cos() / piz_f106.sin();
+
+        let lhs_md = psi_one_minus_z_md.clone() - psi_z_md.clone();
+        let pi_md = md_scalar(F106::pi().to_md128());
+        let piz_md = pi_md.clone() * md_z.clone();
+        let rhs_tan_md = pi_md.clone() / piz_md.clone().tan();
+        let rhs_sincos_md = pi_md.clone() * piz_md.clone().cos() / piz_md.clone().sin();
+
+        fn report_real_primitive(
+            name: &str,
+            f106: F106,
+            md: MD<128>,
+        ) {
+            let f106_as_md = f106.to_md128();
+
+            println!(
+                "{name:16} F106={:.35e} \
+                 MD={:.35e} delta={:.8e}",
+                 f106_as_md.clone(), md.clone(),f106_as_md - md,
+            );
+        }
+
+        let x_f106 = piz_f106.re;
+        let y_f106 = piz_f106.im;
+
+        let x_md = x_f106.to_md128();
+        let y_md = y_f106.to_md128();
+
+        report_real_primitive(
+            "sin(x)",
+            x_f106.sin(),
+            x_md.clone().sin(),
+        );
+        report_real_primitive(
+            "cos(x)",
+            x_f106.cos(),
+            x_md.clone().cos(),
+        );
+        report_real_primitive(
+            "exp(y)",
+            y_f106.exp(),
+            y_md.clone().exp(),
+        );
+        report_real_primitive(
+            "exp(-y)",
+            (-y_f106).exp(),
+            (-y_md.clone()).exp(),
+        );
+        report_real_primitive(
+            "sinh(y)",
+            y_f106.sinh(),
+            y_md.clone().sinh(),
+        );
+        report_real_primitive(
+            "cosh(y)",
+            y_f106.cosh(),
+            y_md.clone().cosh(),
+        );
+
+        let exp_pos = y_f106.exp();
+        let exp_neg = (-y_f106).exp();
+        let exp_neg_reciprocal = F106::one() / exp_pos;
+
+        report_real_primitive(
+            "exp(-y) direct",
+            exp_neg,
+            (-y_md.clone()).exp(),
+        );
+
+        report_real_primitive(
+            "exp(-y) reciprocal",
+            exp_neg_reciprocal,
+            MD::<128>::one() / y_md.clone().exp(),
+        );
+
+        println!(
+            "TwoFloat exp(-y) direct - reciprocal = {:.8e}",
+            (exp_neg - exp_neg_reciprocal).to_md128(),
+        );
+
+        let exp_pos = y_f106.exp();
+        let exp_neg_reciprocal = F106::one() / exp_pos;
+        println!(
+            "reciprocal residual = {:.8e}",
+            (exp_neg_reciprocal * exp_pos - F106::one()).to_md128(),
+        );
+
+        let reciprocal_f106 = F106::one() / exp_pos;
+        let exp_pos_md = exp_pos.to_md128();
+        let reciprocal_md = MD::<128>::one() / exp_pos_md;
+        println!(
+            "reciprocal delta (same denominator) = {:.8e}",
+            reciprocal_f106.to_md128() - reciprocal_md,
+        );
+
+        let exp_pos = y_f106.exp();
+
+        let denominator_md = exp_pos.to_md128();
+        let reference = MD::<128>::one() / denominator_md;
+
+        let q0 = F106::one() / exp_pos;
+        let remainder = F106::one() - exp_pos * q0;
+        let q1 = remainder / exp_pos;
+        let corrected = q0 + q1;
+
+        report_real_primitive("reciprocal original", q0, reference.clone());
+        report_real_primitive("reciprocal corrected", corrected, reference);
+
+        println!("remainder = {:.8e}", remainder.to_md128());
+        println!("correction = {:.8e}", q1.to_md128());
+
+        let f106_summary = vec![
+            ("reflection.lhs", lhs_f106),
+            ("reflection.rhs_tan", rhs_tan_f106),
+            ("reflection.rhs_sincos", rhs_sincos_f106),
+            ("reflection.lhs_minus_rhs_tan", lhs_f106 - rhs_tan_f106),
+            ("reflection.rhs_sincos_minus_tan", rhs_sincos_f106 - rhs_tan_f106),
+        ];
+        let md_summary = vec![
+            ("reflection.lhs", lhs_md.clone()),
+            ("reflection.rhs_tan", rhs_tan_md.clone()),
+            ("reflection.rhs_sincos", rhs_sincos_md.clone()),
+            ("reflection.lhs_minus_rhs_tan", lhs_md.clone() - rhs_tan_md.clone()),
+            ("reflection.rhs_sincos_minus_tan", rhs_sincos_md.clone() - rhs_tan_md.clone()),
+        ];
+        let f_summary_trace = f106_summary
+            .iter()
+            .map(|(name, value)| DigammaTracePoint {
+                name: (*name).to_string(),
+                re: value.re.to_md128(),
+                im: value.im.to_md128(),
+            })
+            .collect::<Vec<_>>();
+        let md_summary_trace = md_summary
+            .iter()
+            .map(|(name, value)| DigammaTracePoint {
+                name: (*name).to_string(),
+                re: value.re.clone(),
+                im: value.im.clone(),
+            })
+            .collect::<Vec<_>>();
+        compare_digamma_traces(
+            "reflection identity final assembly",
+            &f_summary_trace,
+            &md_summary_trace,
+        );
+
+        let f106_residual = lhs_f106 - rhs_tan_f106;
+        let md_residual = lhs_md - rhs_tan_md;
+        println!(
+            "\\nReflection residual (target: 0): F106=({:.20e}, {:.20e}), MD<128>=({:.20e}, {:.20e})",
+            f106_residual.re.to_md128(),
+            f106_residual.im.to_md128(),
+            md_residual.re,
+            md_residual.im,
         );
     }
 
