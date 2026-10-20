@@ -434,3 +434,139 @@ impl Real for F106 {
         Self::from(self.inner.powi(n))
     }
 }
+
+#[cfg(test)]
+mod twofloat_tests {
+    use std::io::Write;
+
+use super::*;
+
+    fn report_hyperbolic_accuracy(
+        name: &str,
+        x: f64,
+        f106: F106,
+        md: MD<128>,
+    ) {
+        print!("{name:<5} x={x:>22.14e} ");
+        let actual = f106.to_md128();
+        print!("F106={actual:.35e} MD={md:.35e} ");
+        std::io::stdout().flush().unwrap();
+        if ! md.is_finite() {
+            println!(" # WARN: MD is not finite.");
+            return;
+        }
+
+        let delta = actual.clone() - md.clone();
+        print!("delta={delta:.8e} ");
+        let abs_error = delta.clone().abs();
+        print!("abs_err={abs_error:.8e} ");
+        let zero = MD::<128>::from_f64(0.0);
+        if md == zero {
+            println!("rel_err=N/A");
+        } else {
+            let relative_error = abs_error.clone() / md.clone().abs();
+            println!("rel_err={relative_error:.8e}");
+        }
+    }
+
+    fn check_hyperbolic_unrestricted(x: f64) {
+        let xf = F106::from_f64(x);
+        let xm = MD::<128>::from_f64(x);
+
+        report_hyperbolic_accuracy("sinh", x, xf.sinh(), xm.clone().sinh());
+        report_hyperbolic_accuracy("cosh", x, xf.cosh(), xm.clone().cosh());
+        report_hyperbolic_accuracy("tanh", x, xf.tanh(), xm.clone().tanh());
+        report_hyperbolic_accuracy("asinh", x, xf.asinh(), xm.asinh());
+    }
+
+    #[test]
+    fn test_hyperbolic_function_accuracy_against_md128() {
+        // sinh / cosh / tanh / asinh
+        let general_inputs: &[f64] = &[
+            -100.0,
+            -20.0,
+            -10.0,
+            -1.0,
+            -0.5,
+            -1e-8,
+            -1e-20,
+            -1e-30,
+            0.0,
+            1e-30,
+            1e-20,
+            1e-8,
+            0.1,
+            0.5,
+            1.0,
+            std::f64::consts::FRAC_PI_2,
+            2.0,
+            10.0,
+            20.0,
+            100.0,
+        ];
+
+        for &x in general_inputs {
+            check_hyperbolic_unrestricted(x);
+        }
+
+        // asinh: 極端に大きい入力も追加
+        for &x in &[-1e100, 1e100] {
+            let xf = F106::from_f64(x);
+            let xm = MD::<128>::from_f64(x);
+
+            report_hyperbolic_accuracy("asinh", x, xf.asinh(), xm.asinh());
+        }
+
+        // acosh: 実数の定義域は x >= 1
+        let one_next_up = f64::from_bits(1.0_f64.to_bits() + 1);
+
+        let acosh_inputs: &[f64] = &[
+            1.0,
+            one_next_up,
+            1.0 + 1e-12,
+            1.0001,
+            1.1,
+            1.5,
+            2.0,
+            10.0,
+            100.0,
+            1e100,
+        ];
+
+        for &x in acosh_inputs {
+            let xf = F106::from_f64(x);
+            let xm = MD::<128>::from_f64(x);
+
+            report_hyperbolic_accuracy("acosh", x, xf.acosh(), xm.acosh());
+        }
+
+        // atanh: 実数の定義域は -1 < x < 1
+        // ±1 に最も近い f64 の内部値も調べる
+        let one_next_down = f64::from_bits(1.0_f64.to_bits() - 1);
+
+        let atanh_inputs: &[f64] = &[
+            -one_next_down,
+            -0.9,
+            -0.5,
+            -0.1,
+            -1e-8,
+            -1e-20,
+            -1e-30,
+            0.0,
+            1e-30,
+            1e-20,
+            1e-8,
+            0.1,
+            0.5,
+            0.9,
+            one_next_down,
+        ];
+
+        for &x in atanh_inputs {
+            let xf = F106::from_f64(x);
+            let xm = MD::<128>::from_f64(x);
+
+            report_hyperbolic_accuracy("atanh", x, xf.atanh(), xm.atanh());
+        }
+    }
+}

@@ -944,6 +944,12 @@ impl <const N: usize> Real for MD<N> {
     }
 }
 
+impl<const N: usize> MD<N> {
+    pub fn is_finite(&self) -> bool {
+        self.value.repr().is_finite()
+    }
+}
+
 #[cfg(test)]
 mod tests_chudnovsky {
     use super::*;
