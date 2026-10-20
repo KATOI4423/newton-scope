@@ -355,10 +355,18 @@ impl Real for F106 {
 
     // Hyperbolic functions
     fn sinh(self) -> Self {
-        Self::from(self.inner.sinh())
+        if self.is_zero() {
+            return self;
+        }
+
+        let exp = self.exp();
+        let exp_neg = (-self).exp();
+        (exp - exp_neg) * Self::from_f64(0.5)
     }
     fn cosh(self) -> Self {
-        Self::from(self.inner.cosh())
+        let exp = self.exp();
+        let exp_neg = (-self).exp();
+        (exp + exp_neg) * Self::from_f64(0.5)
     }
     fn tanh(self) -> Self {
         Self::from(self.inner.tanh())
