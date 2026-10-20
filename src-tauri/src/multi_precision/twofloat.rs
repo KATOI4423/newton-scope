@@ -12,8 +12,10 @@ use std::str::FromStr;
 use formulac::core::Real;
 use num_traits::{
     Float,
+    FromPrimitive,
     Num,
     ToPrimitive,
+    Inv,
     One,
     Zero,
 };
@@ -116,7 +118,9 @@ impl Mul for F106 {
 impl Div for F106 {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        Self::from(self.inner.div(rhs.inner))
+        let x = rhs.inner.inv();
+        let x = x * (TwoFloat::from_u8(2).unwrap() - rhs.inner * x);
+        Self::from(self.inner * x)
     }
 }
 
