@@ -102,6 +102,36 @@ impl F106 {
 
         Self::from(z)
     }
+
+    /// |x| < 0.5 の場合の asinh をマクローリン展開で近似する
+    ///
+    /// ``` math
+    ///                  1   x^3    1*3   x^5     1*3*5   x^7
+    /// asinh(x) = x  -  ― * ―――  + ――― * ―――  -  ――――― * ――― + ...
+    ///                  2    3     2*4    5      2*4*6    7
+    ///
+    /// ```
+    fn asinh_expand(self) -> Self {
+        let x2 = self * self;
+        let mut sum = self;
+        let mut term = self;
+
+        for n in 0..128 {
+            let odd = Self::from_f64((2 * n + 1) as f64);
+            let denominator = Self::from_f64((2 * (n + 1) * (2 * n + 3)) as f64);
+
+            term = -(term * x2 * odd * odd / denominator);
+
+            let next = sum + term;
+            if next == sum {
+                break;
+            }
+
+            sum = next;
+        }
+
+        sum
+    }
 }
 
 impl LowerExp for F106 {
@@ -386,8 +416,22 @@ impl Real for F106 {
             result
         }
     }
+    /// - |x| <= 0.5: asinh(x) = x - x^3 / 6 + 3x^5 / 40 - 5x^7 / 112 + ...
+    /// - |x| > 0.5: asinh(x) = ln(x + √(x^2 + 1)) = sgn(x) * [ln(|x|) + ln(1 + √(1 + 1/|x|^2))]
     fn asinh(self) -> Self {
-        Self::from(self.inner.asinh())
+        let abs_x = self.abs();
+        if abs_x <= Self::from_f64(0.5) {
+            return self.asinh_expand();
+        }
+
+        let inv_x = Self::one() / abs_x;
+        let result = abs_x.ln() + (Self::one() + (Self::one() + inv_x * inv_x).sqrt()).ln();
+
+        if self.is_sign_negative() {
+            -result
+        } else {
+            result
+        }
     }
     fn acosh(self) -> Self {
         Self::from(self.inner.acosh())
