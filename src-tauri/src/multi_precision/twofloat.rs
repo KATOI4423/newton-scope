@@ -66,6 +66,42 @@ impl F106 {
     pub fn new_div(lhs: f64, rhs: f64) -> Self {
         TwoFloat::new_div(lhs, rhs).into()
     }
+
+    /// # exp(-x) (x > 0) の値を高精度で計算する
+    ///
+    /// exp(-x) (x > 0) の精度が exp(x) の半分の桁程度しかないため、負の引数の場合は独自アルゴリズムにする.
+    ///
+    /// ``` math
+    /// exp(-x) = ( exp(-x/(2^k)) )^(2^k)
+    ///         = ( 1 / exp(x/(2^k)) )^(2^k)
+    /// ```
+    ///
+    /// exp(x) と除算は高精度で計算可能、かつ、exp( x/(2^k) ) がオーバーフローしないように k を選ぶことで、
+    /// exp(-x) を高精度かつ安全に計算できる。
+    fn exp_narrowed_range(self) -> Self {
+        let x = -self;
+
+        // exp(x / 2^k) の引数を安全な範囲に収める
+        let reduction_limit = Self::from_f64(300.0);
+        let half = Self::from_f64(0.5);
+        let mut z = x;
+        let mut squarings = 0;
+
+        while z > reduction_limit {
+            z *= half;
+            squarings += 1;
+        }
+
+        // exp(-z) = 1 / exp(z)
+        let mut z = Self::one() / z.exp();
+
+        // exp(-x) = exp(-z) ^ (2^k)
+        for _ in 0..squarings {
+            z *= z;
+        }
+
+        Self::from(z)
+    }
 }
 
 impl LowerExp for F106 {
@@ -339,7 +375,15 @@ impl Real for F106 {
 
     // Exponential and Logarithmic
     fn exp(self) -> Self {
-        Self::from(self.inner.exp())
+        if !self.is_finite() {
+            // ! finite の場合は、 TwoFloat の処理に任せる
+            Self::from(self.inner.exp())
+        } else if self.is_sign_negative() {
+            // 負の場合は TwoFloat の精度が低いので、特別処理
+            self.exp_narrowed_range()
+        } else {
+            Self::from(self.inner.exp())
+        }
     }
     fn ln(self) -> Self {
         Self::from(self.inner.ln())
