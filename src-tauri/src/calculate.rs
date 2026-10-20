@@ -1,3 +1,4 @@
+use formulac::CompiledFormula;
 use formulac::{
     self,
     core::Real,
@@ -47,27 +48,6 @@ mod default {
     pub const FRACTAL_MAX_ITER: u16 = 64;
 }
 
-/// 静的ディスパッチ用ラッパ
-struct FuncHolder<F, T: Real, const N: usize>
-where
-    F: Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static,
-{
-    func: Arc<F>,
-    _marker: PhantomData<T>,
-}
-
-impl<F, T: Real, const N: usize> FuncHolder<F, T, N>
-where
-    F: Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static,
-{
-    fn call(&self, args: [Complex<T>; N]) -> Complex<T> {
-        (self.func)(args)
-    }
-}
-
-/// Formulacが生成する匿名関数を保持する
-pub type Func<T, const N: usize> = Arc<dyn Fn([Complex<T>; N]) -> Complex<T> + Send + Sync + 'static>;
-
 /// formulacのarity
 pub(crate) const ARITY: usize = 1;
 
@@ -76,8 +56,8 @@ pub(crate) const ARITY: usize = 1;
 struct FormulacInner<T: Real>
 where
 {
-    f: Func<T, ARITY>,
-    df: Func<T, ARITY>,
+    f: formulac::CompiledFormula<T, ARITY>,
+    df: formulac::CompiledFormula<T, ARITY>,
 }
 
 impl<T> std::fmt::Debug for FormulacInner<T>
@@ -95,15 +75,17 @@ impl<T> FormulacInner<T>
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+    Complex<T>: Gamma + Digamma,
 {
     fn new() -> Self {
+        let (f, df) = Self::initialize(default::FORMULA).unwrap();
         Self {
-            f: Arc::new(|_: [Complex<T>; ARITY]| Complex::zero()),
-            df: Arc::new(|_: [Complex<T>; ARITY]| Complex::zero()),
+            f,
+            df,
         }
     }
 
-    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError>
+    fn initialize(formula: &str) -> Result<(CompiledFormula<T, ARITY>, CompiledFormula<T, ARITY>), formulac::err::ParseError>
     where
         Complex<T>: Gamma + Digamma,
     {
@@ -116,26 +98,24 @@ where
             ])
             .compile_with_derivative("z")?;
 
-        let f_arc = Arc::new(f);
-        let df_arc = Arc::new(df);
+        Ok((f, df))
+    }
 
-        self.f = Arc::new({
-            let f_holder = FuncHolder { func: f_arc.clone(), _marker: PhantomData };
-            move |args| f_holder.call(args)
-        });
-        self.df = Arc::new({
-            let df_holder = FuncHolder { func: df_arc.clone(), _marker: PhantomData };
-            move |args| df_holder.call(args)
-        });
-
+    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError>
+    where
+        Complex<T>: Gamma + Digamma,
+    {
+        let (f, df) = Self::initialize(formula)?;
+        self.f = f;
+        self.df = df;
         Ok(())
     }
 
-    fn func(&self) -> &Func<T, ARITY> {
+    fn func(&self) -> &CompiledFormula<T, ARITY> {
         &self.f
     }
 
-    fn deriv(&self) -> &Func<T, ARITY> {
+    fn deriv(&self) -> &CompiledFormula<T, ARITY> {
         &self.df
     }
 }
@@ -634,6 +614,7 @@ fn render_tile_inner<T>(fr: &FractalInner<T>, fo: &FormulacInner<T>, x: u32, y: 
 where
     T: Real + FromStr + Send + Sync + 'static
         + AddAssign + SubAssign + MulAssign + DivAssign + RemAssign,
+    Complex<T>: Gamma + Digamma,
 {
     btm::calc_rect(btm::CalcInfo::new(
             x, y, w, h,

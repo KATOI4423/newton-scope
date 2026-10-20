@@ -3,6 +3,10 @@ use formulac::core::{
     ComplexMath,
     Real,
 };
+use formulac::{
+    CompiledFormula,
+    Scratch,
+};
 use num_complex::Complex;
 use rayon::prelude::*;
 use std::ops::{
@@ -15,7 +19,6 @@ use std::ops::{
 use std::collections::VecDeque;
 use crate::calculate::{
     ARITY,
-    Func,
 };
 
 const UNCALCULATED: u16 = u16::MAX;
@@ -74,8 +77,8 @@ where
     pub size:   T,
     pub center: Complex<T>,
     pub range:  T,
-    pub func:   Func<T, ARITY>,
-    pub deriv:  Func<T, ARITY>,
+    pub func:   CompiledFormula<T, ARITY>,
+    pub deriv:  CompiledFormula<T, ARITY>,
     pub coeff:  Complex<T>
 }
 
@@ -94,7 +97,7 @@ where
     pub fn new(
         x: u32, y: u32, w: u32, h: u32,
         max_itr: u16, size: T, center: Complex<T>, range: T,
-        func: Func<T, ARITY>, deriv: Func<T, ARITY>,
+        func: CompiledFormula<T, ARITY>, deriv: CompiledFormula<T, ARITY>,
         coeff: Complex<T>,
     ) -> Self {
         Self {
@@ -122,11 +125,16 @@ where
 }
 
 #[inline]
-fn newton_method<T>(z: Complex<T>, a: Complex<T>, func: &Func<T, ARITY>, deriv: &Func<T, ARITY>) -> Complex<T>
+fn newton_method<T>(
+    z: Complex<T>, a: Complex<T>,
+    func: &CompiledFormula<T, ARITY>, fs: &mut Scratch<T>,
+    deriv: &CompiledFormula<T, ARITY>, ds: &mut Scratch<T>,
+) -> Complex<T>
 where
     T: Real + Send + Sync + 'static
 {
-    z.clone() - func([z.clone()]) / deriv([z]) * a
+    let args = [z.clone()];
+    z - func.eval_with_scratch(&args, fs) / deriv.eval_with_scratch(&args, ds) * a
 }
 
 #[inline]
@@ -145,7 +153,12 @@ where
     }
 }
 
-fn calc_escape_time<T>(z: Complex<T>, a: &Complex<T>, func: &Func<T, ARITY>, deriv: &Func<T, ARITY>, max_itr: u16) -> u16
+fn calc_escape_time<T>(
+    z: Complex<T>, a: &Complex<T>,
+    func: &CompiledFormula<T, ARITY>, fs: &mut Scratch<T>,
+    deriv: &CompiledFormula<T, ARITY>, ds: &mut Scratch<T>,
+    max_itr: u16,
+) -> u16
 where
     T: Real + Send + Sync + 'static
 {
@@ -153,7 +166,7 @@ where
     let epsilon: T = T::from_f64(10e-5);
 
     for n in 0..max_itr {
-        let z2 = newton_method(z1.clone(), a.clone(), func, deriv);
+        let z2 = newton_method(z1.clone(), a.clone(), func, fs, deriv, ds);
 
         if is_same(&z1, &z2, epsilon.clone()) {
             return n;
@@ -188,6 +201,7 @@ fn calc_edge<T>(
     is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
     info: &CalcInfo<T>,
+    fs: &mut Scratch<T>, ds: &mut Scratch<T>,
 )
 where
     T: Real + Send + Sync + 'static
@@ -198,20 +212,20 @@ where
 
     // 上辺 (y=0)
     let idx_start = 0;
-    buffer[idx_start] = calc_escape_time(info.get_complex(0, 0), &info.coeff, &info.func, &info.deriv, info.max_itr);
+    buffer[idx_start] = calc_escape_time(info.get_complex(0, 0), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
     for x in 1..w {
         let idx = x as usize;
-        let val = calc_escape_time(info.get_complex(x, 0), &info.coeff, &info.func, &info.deriv, info.max_itr);
+        let val = calc_escape_time(info.get_complex(x, 0), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
         update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: 0 }, val);
     }
 
     // 下辺 (y=h-1)
     let y_bottom = h - 1;
     let offset_bottom = (y_bottom * w) as usize;
-    buffer[offset_bottom] = calc_escape_time(info.get_complex(0, y_bottom), &info.coeff, &info.func, &info.deriv, info.max_itr);
+    buffer[offset_bottom] = calc_escape_time(info.get_complex(0, y_bottom), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
     for x in 1..w {
         let idx = offset_bottom + x as usize;
-        let val = calc_escape_time(info.get_complex(x, y_bottom), &info.coeff, &info.func, &info.deriv, info.max_itr);
+        let val = calc_escape_time(info.get_complex(x, y_bottom), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
         update_boundary(buffer, is_pushed, boundaries, idx, idx - 1, Coordinates { x, y: y_bottom }, val);
     }
 
@@ -220,7 +234,7 @@ where
         for x in [0, w - 1] {
             let idx = ((y * w) + x) as usize;
             let idx_above = idx - w as usize ; // 上のマスと比較
-            let val = calc_escape_time(info.get_complex(x, y), &info.coeff, &info.func, &info.deriv, info.max_itr);
+            let val = calc_escape_time(info.get_complex(x, y), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
             update_boundary(buffer, is_pushed, boundaries, idx, idx_above, Coordinates { x, y }, val);
         }
     }
@@ -231,6 +245,7 @@ fn track_boundary<T>(
     is_pushed: &mut PushedFlags,
     boundaries: &mut VecDeque<Coordinates>,
     info: &CalcInfo<T>,
+    fs: &mut Scratch<T>, ds: &mut Scratch<T>,
 )
 where
     T: Real + Send + Sync + 'static
@@ -250,7 +265,7 @@ where
 
             let idx = target.to_index(w);
             if buffer[idx] == UNCALCULATED {
-                buffer[idx] = calc_escape_time(info.get_complex(target.x, target.y), &info.coeff, &info.func, &info.deriv, info.max_itr);
+                buffer[idx] = calc_escape_time(info.get_complex(target.x, target.y), &info.coeff, &info.func, fs, &info.deriv, ds, info.max_itr);
             }
             if (buffer[idx] != boundary_val) && !is_pushed[idx] {
                 is_pushed.set(idx, true);
@@ -333,9 +348,11 @@ where
     let mut boundaries = VecDeque::new();
     let mut is_pushed = bitvec![u8, Lsb0; 0 /* false  */; len];
     let mut buffer = vec![UNCALCULATED; len];
+    let mut fs = info.func.new_scratch();
+    let mut ds = info.deriv.new_scratch();
 
-    calc_edge(&mut buffer, &mut is_pushed, &mut boundaries, &info);
-    track_boundary(&mut buffer, &mut is_pushed, &mut boundaries, &info);
+    calc_edge(&mut buffer, &mut is_pushed, &mut boundaries, &info, &mut fs, &mut ds);
+    track_boundary(&mut buffer, &mut is_pushed, &mut boundaries, &info, &mut fs, &mut ds);
     fill_in_the_rest(&mut buffer, info.width, info.height);
 
     buffer
