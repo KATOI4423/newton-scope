@@ -368,8 +368,23 @@ impl Real for F106 {
         let exp_neg = (-self).exp();
         (exp + exp_neg) * Self::from_f64(0.5)
     }
+    /// - |x| <= 0.5: tanh(x) = sinh(x) / cosh(x)
+    /// - |x| >  0.5: tanh(x) = sgn(x) * (1 - exp(-2|x|)) / (1 + exp(-2|x|))
     fn tanh(self) -> Self {
-        Self::from(self.inner.tanh())
+        let abs_x = self.abs();
+
+        if abs_x <= Self::from_f64(0.5) {
+            return self.sinh() / self.cosh();
+        }
+
+        let exp = (Self::from_f64(-2.0) * abs_x).exp();
+        let result = (Self::one() - exp) / (Self::one() + exp);
+
+        if self.is_sign_negative() {
+            -result
+        } else {
+            result
+        }
     }
     fn asinh(self) -> Self {
         Self::from(self.inner.asinh())
