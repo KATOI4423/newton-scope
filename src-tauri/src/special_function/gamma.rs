@@ -28,10 +28,6 @@ pub(crate) trait Gamma {
 
 impl Gamma for Complex<f64> {
     fn gamma(&self) -> Self {
-        if self.im.is_zero() {
-            return Self::from(special::Gamma::gamma(self.re));
-        }
-
         let z = if self.re.is_sign_negative() { Self::ONE - self } else { *self };
         const THRESHOLD_FOR_TAYLOR_EXPANSION_OF_INV_GAMMA: f64 = 1.45;
         let result = if self.im.abs() < THRESHOLD_FOR_TAYLOR_EXPANSION_OF_INV_GAMMA {
@@ -788,10 +784,6 @@ pub(crate) trait Digamma {
 
 impl Digamma for Complex<f64> {
     fn digamma(&self) -> Self {
-        if self.im.is_zero() {
-            return Self::from(special::Gamma::digamma(self.re));
-        }
-
         const ASYMPTOTIC_THRESHOLD: f64 = 10.0;
         let (mut w, flag) = if self.re >= ASYMPTOTIC_THRESHOLD {
             (*self, DiggammaFlag::empty())
