@@ -1,13 +1,11 @@
-use formulac::CompiledFormula;
 use formulac::{
-    self,
+    Builder,
+    CompiledFormula,
     core::Real,
+    err::ParseError,
     UserFn,
 };
 use num_complex::Complex;
-use num_traits::{
-    Zero,
-};
 use once_cell::sync::Lazy;
 use png;
 use png::text_metadata::TEXtChunk;
@@ -15,7 +13,6 @@ use serde::{
     Serialize, Deserialize,
 };
 use serde::de::DeserializeOwned;
-use std::marker::PhantomData;
 use std::ops::{
     AddAssign,
     SubAssign,
@@ -25,7 +22,6 @@ use std::ops::{
 };
 use std::str::FromStr;
 use std::sync::{
-    Arc,
     Mutex,
 };
 
@@ -56,8 +52,8 @@ pub(crate) const ARITY: usize = 1;
 struct FormulacInner<T: Real>
 where
 {
-    f: formulac::CompiledFormula<T, ARITY>,
-    df: formulac::CompiledFormula<T, ARITY>,
+    f: CompiledFormula<T, ARITY>,
+    df: CompiledFormula<T, ARITY>,
 }
 
 impl<T> std::fmt::Debug for FormulacInner<T>
@@ -85,14 +81,14 @@ where
         }
     }
 
-    fn initialize(formula: &str) -> Result<(CompiledFormula<T, ARITY>, CompiledFormula<T, ARITY>), formulac::err::ParseError>
+    fn initialize(formula: &str) -> Result<(CompiledFormula<T, ARITY>, CompiledFormula<T, ARITY>), ParseError>
     where
         Complex<T>: Gamma + Digamma,
     {
         let gamma = UserFn::new("gamma", |[z]: [Complex<T>; ARITY]| z.gamma())
             .with_derivative([UserFn::new("gamma'", |[z]| { z.gamma() * z.digamma()})])
             .expect("The count of derivatives are different from ARITY");
-        let (f, df) = formulac::Builder::<T, ARITY>::new(formula, ["z"])
+        let (f, df) = Builder::<T, ARITY>::new(formula, ["z"])
             .with_user_functions([
                 gamma
             ])
@@ -101,7 +97,7 @@ where
         Ok((f, df))
     }
 
-    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError>
+    fn set_formula(&mut self, formula: &str) -> Result<(), ParseError>
     where
         Complex<T>: Gamma + Digamma,
     {
@@ -273,7 +269,7 @@ where
         &mut self.formulac
     }
 
-    fn set_formula(&mut self, formula: &str) -> Result<(), formulac::err::ParseError> {
+    fn set_formula(&mut self, formula: &str) -> Result<(), ParseError> {
         match self.formulac_mut() {
             Formulac::F64(f) => f.set_formula(formula)?,
             Formulac::F106(f) => f.set_formula(formula)?,
