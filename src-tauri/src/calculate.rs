@@ -431,7 +431,8 @@ pub fn get_available_syntax() -> Syntax {
     let mut constants = from(formulac::constants::Constants::<f64>::symbols().to_vec());
     constants.push(formulac::lexer::IMAGINARY_UNIT.to_string());
 
-    let functions = from(formulac::functions::FunctionKind::symbols().to_vec());
+    let mut functions = from(formulac::functions::FunctionKind::symbols().to_vec());
+    functions.push("gamma".into());
 
     Syntax {
         operators,
