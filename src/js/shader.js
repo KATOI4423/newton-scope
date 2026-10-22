@@ -24,7 +24,7 @@ const shiftOffset = {
  * @param {string} canvasId canvas要素のID
  * @param {string} vertexPath vertex.glslのパス
  * @param {string} fragmentPath fragment.glslのパス
- * @returns {void}
+ * @returns {Promise<void>}
  */
 async function initGL(canvasId, vertexPath, fragmentPath) {
     const canvas = document.getElementById(canvasId);
@@ -319,7 +319,7 @@ function switchTexture() {
  * GPUテクスチャに部分更新をかける
  * @param {number} pixelDx X軸方向の移動量
  * @param {number} pixelDy Y軸方向の移動量
- * @returns {void}
+ * @returns {Promise<void>}
  */
 export async function updateTile(pixelDx, pixelDy) {
     if (!gl) return;
