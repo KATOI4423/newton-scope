@@ -278,3 +278,34 @@ button {
         padding-top: 10px;
     }
 }
+
+/* Center / Scale の値だけマウスで選択にし、その他は選択不可にする */
+.canvas-wrap,
+.canvas-wrap * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+canvas {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.controls {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.controls input,
+.controls textarea,
+.controls [contentediable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+#center,
+#scale {
+    -webkit-user-select: text;
+    user-select: text;
+}
